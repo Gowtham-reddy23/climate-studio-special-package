@@ -1,7 +1,7 @@
 # Cove — Best-of-Notch Design Spec
 
 - **Date:** 2026-09-29
-- **Status:** Draft for review
+- **Status:** Implemented — Phases 1–5 + moodboard built; native remove-bg & calendar compiled and running (pending user runtime confirmation). See `docs/superpowers/plans/` for per-phase plans.
 - **Owner:** gowtham@altcarbon.com
 - **Topic:** Enhance Cove into a best-of-NotchOwl + Tucket + codenotch macOS notch app, with a proper Dynamic Island shell.
 

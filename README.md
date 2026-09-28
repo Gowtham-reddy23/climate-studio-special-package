@@ -2,6 +2,20 @@
 
 Mac notch workspace: persistent clipboard, auto-sorted by type, plus tasks, focus, notes, and calendar in the same island.
 
+## Features
+
+- **Dynamic Island** — spring-animated notch (idle → hover-peek → expanded) with live-activity pills: focus countdown, clip-landed, recording waveform, secret-blocked, agent usage. Model is pure + unit-tested (`src/island/`).
+- **Clipboard** — auto-categorized clips (11 kinds), color auto-naming (hex/rgb/hsl → nearest named color), OCR search in screenshots, secret/credential detection that never stores.
+- **Skins** — Glass / Dark / Light / Mat, switchable and persisted (`data-skin` on root).
+- **Moodboard** — select image clips → one grid-composited image.
+- **Remove background** (native) — Apple Vision cutout via the ✂ action on image clips.
+- **Productivity** — tasks, focus timer (lives in the notch), daily notepad with ⌘↩ line→task, weekly insights.
+- **Real Apple Calendar** (native) — upcoming events via EventKit (read-only).
+- **Agents** (native) — live Claude Code / Cursor / Codex usage in the island.
+- **Backup** — JSON export/import; IndexedDB blob storage with quota-safe writes and orphan pruning.
+
+Tests: `npm test` (Vitest — pure island/color/storage/moodboard logic).
+
 ## Run
 
 ```bash
