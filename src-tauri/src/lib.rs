@@ -1,6 +1,7 @@
 mod agents;
 mod ocr;
 mod paste;
+mod removebg;
 
 use arboard::Clipboard;
 use base64::{engine::general_purpose::STANDARD, Engine as _};
@@ -393,7 +394,8 @@ pub fn run() {
       agents::ai_agents,
       quit_cove,
       ocr::ocr_image,
-      paste::set_paste_slots
+      paste::set_paste_slots,
+      removebg::remove_bg
     ])
     .setup(|app| {
       #[cfg(target_os = "macos")]

@@ -84,6 +84,50 @@ export async function ocrImage(blob: Blob): Promise<string | null> {
   }
 }
 
+export async function removeBackground(blob: Blob): Promise<Blob | null> {
+  if (!isNativeApp()) return null;
+  try {
+    const bmp = await createImageBitmap(blob);
+    const max = 2048;
+    const scale = Math.min(1, max / Math.max(bmp.width, bmp.height));
+    const w = Math.max(1, Math.round(bmp.width * scale));
+    const h = Math.max(1, Math.round(bmp.height * scale));
+    const canvas = document.createElement("canvas");
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return null;
+    ctx.drawImage(bmp, 0, 0, w, h);
+    const data = ctx.getImageData(0, 0, w, h).data;
+    let bin = "";
+    const chunk = 0x8000;
+    for (let i = 0; i < data.length; i += chunk) {
+      bin += String.fromCharCode(...data.subarray(i, i + chunk));
+    }
+    const { invoke } = await import("@tauri-apps/api/core");
+    const result = await invoke<{ rgba: string; width: number; height: number } | null>("remove_bg", {
+      rgba: btoa(bin),
+      width: w,
+      height: h,
+    });
+    if (!result) return null;
+    const outBin = atob(result.rgba);
+    const outBytes = new Uint8ClampedArray(outBin.length);
+    for (let i = 0; i < outBin.length; i += 1) outBytes[i] = outBin.charCodeAt(i);
+    const outCanvas = document.createElement("canvas");
+    outCanvas.width = result.width;
+    outCanvas.height = result.height;
+    const outCtx = outCanvas.getContext("2d");
+    if (!outCtx) return null;
+    outCtx.putImageData(new ImageData(outBytes, result.width, result.height), 0, 0);
+    return await new Promise<Blob | null>((resolve) =>
+      outCanvas.toBlob((b) => resolve(b), "image/png"),
+    );
+  } catch {
+    return null;
+  }
+}
+
 export async function syncPasteSlots(
   slots: { text?: string; width?: number; height?: number; rgba?: string }[],
 ) {

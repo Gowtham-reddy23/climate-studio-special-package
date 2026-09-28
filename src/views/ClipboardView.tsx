@@ -6,6 +6,7 @@ import { SkinPicker } from "../components/SkinPicker";
 import { Waveform } from "../components/Waveform";
 import { pasteFaces } from "../faces";
 import { formatTime, formatWhen } from "../lib";
+import { isNativeApp, removeBackground } from "../native";
 import { makeClip, useStore } from "../store";
 import type { Clip, ClipKind, Craft } from "../types";
 
@@ -185,7 +186,47 @@ export function ClipboardView({
 
 function ClipCard({ clip, onCopy }: { clip: Clip; onCopy: (content: string) => void }) {
   const { dispatch } = useStore();
+  const [cutting, setCutting] = useState(false);
   const faces = pasteFaces(clip);
+
+  const cutOut = async () => {
+    if (cutting) return;
+    setCutting(true);
+    try {
+      const { loadBlob, saveBlob, thumbFromBlob } = await import("../blobDb");
+      let src: Blob | null = clip.meta.imageId ? await loadBlob(clip.meta.imageId) : null;
+      if (!src && clip.content.startsWith("data:")) {
+        src = await fetch(clip.content).then((r) => r.blob());
+      }
+      if (!src) return;
+      const cut = await removeBackground(src);
+      if (!cut) return;
+      const next = makeClip({
+        kind: "image",
+        content: "Cutout",
+        preview: "Cutout",
+        pinned: false,
+        board: "Design",
+        source: "Remove BG",
+        meta: {},
+      });
+      next.meta.imageId = next.id;
+      await saveBlob(next.id, cut);
+      try {
+        const t = await thumbFromBlob(cut);
+        next.content = t.dataUrl;
+        next.meta.width = t.width;
+        next.meta.height = t.height;
+        next.preview = "Background removed";
+      } catch {
+        /* blob saved */
+      }
+      dispatch({ type: "add-clip", clip: next });
+    } finally {
+      setCutting(false);
+    }
+  };
+
   return (
     <article className={`clip is-${clip.kind}`}>
       {clip.kind === "color" ? (
@@ -250,6 +291,11 @@ function ClipCard({ clip, onCopy }: { clip: Clip; onCopy: (content: string) => v
         </div>
       )}
       <div className="actions">
+        {clip.kind === "image" && isNativeApp() ? (
+          <button className="icon-btn" title="Remove background" onClick={cutOut} disabled={cutting}>
+            {cutting ? "…" : "✂"}
+          </button>
+        ) : null}
         <button className="icon-btn" aria-pressed={clip.pinned} title="Pin" onClick={() => dispatch({ type: "toggle-pin", id: clip.id })}>
           {clip.pinned ? "★" : "☆"}
         </button>
