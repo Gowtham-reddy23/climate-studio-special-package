@@ -14,6 +14,29 @@ export function isNativeApp() {
   return typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 }
 
+export type PermSnapshot = {
+  accessibility: boolean;
+  calendar: string;
+};
+
+export async function permissionStatus(): Promise<PermSnapshot> {
+  if (!isNativeApp()) return { accessibility: true, calendar: "unavailable" };
+  const { invoke } = await import("@tauri-apps/api/core");
+  return invoke<PermSnapshot>("permission_status");
+}
+
+export async function requestAccessibility(): Promise<boolean> {
+  if (!isNativeApp()) return false;
+  const { invoke } = await import("@tauri-apps/api/core");
+  return invoke<boolean>("request_accessibility");
+}
+
+export async function openPrivacy(kind: "accessibility" | "calendar") {
+  if (!isNativeApp()) return;
+  const { invoke } = await import("@tauri-apps/api/core");
+  await invoke("open_privacy", { kind });
+}
+
 export async function quitCove() {
   if (!isNativeApp()) {
     window.close();

@@ -168,6 +168,8 @@ function reduce(state: AppState, action: Action): AppState {
       return { ...state, layout: action.layout };
     case "set-skin":
       return { ...state, skin: action.skin };
+    case "set-pref":
+      return { ...state, [action.key]: action.value };
     case "set-events":
       return { ...state, events: action.events };
     default:
@@ -191,6 +193,9 @@ function loadInitial(): AppState {
       skin: (["glass", "dark", "light", "mat"] as const).includes(parsed.skin as never)
         ? (parsed.skin as AppState["skin"])
         : "dark",
+      hoverOpen: parsed.hoverOpen !== false,
+      showRings: parsed.showRings !== false,
+      showTimer: parsed.showTimer !== false,
       focusLog: Array.isArray(parsed.focusLog) ? parsed.focusLog : seed.focusLog,
     };
   } catch {

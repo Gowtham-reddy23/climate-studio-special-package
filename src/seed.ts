@@ -9,6 +9,9 @@ export const seed: AppState = {
   lastBlockedAt: null,
   layout: "horizontal",
   skin: "dark",
+  hoverOpen: true,
+  showRings: true,
+  showTimer: true,
   notesByDay: {
     [new Date().toISOString().slice(0, 10)]:
       "Ship Cove as one notch, not two apps.\nKeep clipboard types visible without folders.\nTurn copied error text into a task when it matters.\nAsk Arpit/Aditya-shaped question: what belongs in the island when idle?",

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type MouseEvent, type RefObject } from "react";
 import { NotchDock } from "./components/NotchDock";
+import { SettingsWindow } from "./components/SettingsWindow";
 import { AgentsStrip } from "./components/AgentsBento";
 import { Roux } from "./components/Pebble";
 import { Waveform } from "./components/Waveform";
@@ -34,6 +35,7 @@ export function App() {
   const [clock, setClock] = useState(formatClock);
   const [now, setNow] = useState(() => Date.now());
   const [toast, setToast] = useState<string | null>(null);
+  const [sheet, setSheet] = useState(false);
   const hoverTimer = useRef<number | null>(null);
   const closeTimer = useRef<number | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
@@ -333,7 +335,19 @@ export function App() {
     partial: recorder.partial,
   });
 
+  useEffect(() => {
+    const onSheet = () => {
+      pinnedRef.current = true;
+      setPinned(true);
+      setOpenMode(true, true);
+      setSheet(true);
+    };
+    window.addEventListener("cove-settings", onSheet);
+    return () => window.removeEventListener("cove-settings", onSheet);
+  }, [setOpenMode]);
+
   const onIslandEnter = () => {
+    if (!state.hoverOpen) return;
     if (closeTimer.current) window.clearTimeout(closeTimer.current);
     hoverTimer.current = window.setTimeout(() => setOpenMode(true, false), 70);
   };
@@ -450,8 +464,17 @@ export function App() {
                   layout: state.layout === "vertical" ? "horizontal" : "vertical",
                 })
               }
+              showRings={state.showRings}
               onHover={onIslandEnter}
             >
+              {sheet ? (
+                <div className="settings-inline">
+                  <button type="button" className="btn ghost" onClick={() => setSheet(false)}>
+                    Back
+                  </button>
+                  <SettingsWindow />
+                </div>
+              ) : (
               <CovePanel
                 open={open}
                 instant={instant}
@@ -475,6 +498,7 @@ export function App() {
                   setOpenMode(false, false);
                 }}
               />
+              )}
             </NotchDock>
           ) : (
             <>

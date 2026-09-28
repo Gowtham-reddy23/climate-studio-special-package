@@ -15,6 +15,7 @@ export function NotchDock({
   onToggle,
   onLayout,
   onHover,
+  showRings,
   children,
 }: {
   open: boolean;
@@ -25,6 +26,7 @@ export function NotchDock({
   onToggle: () => void;
   onLayout: () => void;
   onHover?: () => void;
+  showRings?: boolean;
   children?: ReactNode;
 }) {
   const [agents, setAgents] = useState<AgentStatus[]>([]);
@@ -70,6 +72,7 @@ export function NotchDock({
         </div>
         <div className="dock-camera" onClick={() => onToggle()} aria-hidden="true" />
         <div className="dock-wing is-right">
+          {showRings === false ? null : (
           <div className="dock-rings" aria-label="Code agents">
             {agents.map((a) => (
               <span
@@ -80,6 +83,7 @@ export function NotchDock({
               />
             ))}
           </div>
+          )}
           {open ? (
             <>
               <button type="button" className="dock-ico" title="Flip layout" onClick={onLayout}>

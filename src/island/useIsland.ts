@@ -12,7 +12,7 @@ export function useIsland(args: {
   const latest = state.clips[0] ?? null;
   const focusTask = state.tasks.find((t) => t.id === state.focus.taskId)?.title ?? null;
 
-  const activities = buildActivities(
+  let activities = buildActivities(
     {
       focus: {
         running: state.focus.running,
@@ -35,6 +35,7 @@ export function useIsland(args: {
     },
     args.now,
   );
+  if (!state.showTimer) activities = activities.filter((a) => a.kind !== "focus-timer");
 
   return selectIsland(activities, args.now);
 }

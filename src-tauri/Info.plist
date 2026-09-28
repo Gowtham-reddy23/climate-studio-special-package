@@ -6,7 +6,5 @@
 	<string>Cove shows your upcoming events in the notch.</string>
 	<key>NSCalendarsUsageDescription</key>
 	<string>Cove shows your upcoming events in the notch.</string>
-	<key>LSUIElement</key>
-	<true/>
 </dict>
 </plist>

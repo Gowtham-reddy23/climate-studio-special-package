@@ -97,6 +97,9 @@ export interface AppState {
   lastBlockedAt: number | null;
   layout: DockLayout;
   skin: Skin;
+  hoverOpen: boolean;
+  showRings: boolean;
+  showTimer: boolean;
 }
 
 export type Action =
@@ -123,4 +126,5 @@ export type Action =
   | { type: "secret-blocked" }
   | { type: "set-layout"; layout: DockLayout }
   | { type: "set-skin"; skin: Skin }
-  | { type: "set-events"; events: CalendarEvent[] };
+  | { type: "set-events"; events: CalendarEvent[] }
+  | { type: "set-pref"; key: "hoverOpen" | "showRings" | "showTimer"; value: boolean };

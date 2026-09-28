@@ -1,7 +1,9 @@
 mod agents;
 mod calendar;
+mod menus;
 mod ocr;
 mod paste;
+mod perms;
 mod removebg;
 
 use arboard::Clipboard;
@@ -9,7 +11,7 @@ use base64::{engine::general_purpose::STANDARD, Engine as _};
 use serde::Serialize;
 use std::thread;
 use std::time::Duration;
-use tauri::{Emitter, LogicalSize, Manager, Size};
+use tauri::{Emitter, LogicalSize, Manager, RunEvent, Size};
 
 const FALLBACK_NOTCH_W: f64 = 196.0;
 const FALLBACK_NOTCH_H: f64 = 32.0;
@@ -397,11 +399,15 @@ pub fn run() {
       ocr::ocr_image,
       paste::set_paste_slots,
       removebg::remove_bg,
-      calendar::calendar_events
+      calendar::calendar_events,
+      perms::permission_status,
+      perms::request_accessibility,
+      perms::open_privacy
     ])
     .setup(|app| {
       #[cfg(target_os = "macos")]
-      app.set_activation_policy(tauri::ActivationPolicy::Accessory);
+      app.set_activation_policy(tauri::ActivationPolicy::Regular);
+      let _ = menus::install(app);
 
       paste::install(app.handle().clone());
       let handle = app.handle().clone();
@@ -425,6 +431,11 @@ pub fn run() {
       }
       Ok(())
     })
-    .run(tauri::generate_context!())
-    .expect("cove failed to start");
+    .build(tauri::generate_context!())
+    .expect("cove failed to start")
+    .run(|app, event| {
+      if let RunEvent::Reopen { .. } = event {
+        menus::open_settings(app);
+      }
+    });
 }

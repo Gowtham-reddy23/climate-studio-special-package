@@ -1,18 +1,19 @@
 :root {
-  --ink: #14111a;
-  --ink-2: #1c1824;
-  --paper: #e8dcc8;
-  --paper-dim: #cbbfaa;
-  --brass: #c9a870;
-  --copper: #c46b4a;
-  --tide: #6a8a8a;
-  --glass: #17141f;
-  --glass-2: #221e2b;
-  --line: rgba(232, 220, 200, 0.12);
-  --line-strong: rgba(232, 220, 200, 0.22);
-  --text: #efe6d6;
-  --muted: #9a9084;
-  --danger: #c46b4a;
+  --ink: #f7f3ea;
+  --ink-2: #efe8dc;
+  --paper: #1c1916;
+  --paper-dim: #6f675c;
+  --brass: #3c3a78;
+  --copper: #8d4032;
+  --tide: #5c6b66;
+  --iris: #3c3a78;
+  --glass: #f6f1e7;
+  --glass-2: #ebe4d6;
+  --line: rgba(28, 25, 22, 0.12);
+  --line-strong: rgba(28, 25, 22, 0.22);
+  --text: #1c1916;
+  --muted: #6f675c;
+  --danger: #8d4032;
   --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
   --sans: "Figtree", "Segoe UI", sans-serif;
   --display: "Syne", "Figtree", sans-serif;
@@ -76,7 +77,7 @@ body,
 #root {
   margin: 0;
   min-height: 100%;
-  background: #07060a;
+  background: #efe8dc;
   color: var(--text);
   font-family: var(--sans);
 }
@@ -97,6 +98,17 @@ html.native #root {
   min-height: 100%;
   --sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Figtree", sans-serif;
   --display: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Syne", sans-serif;
+}
+
+html.is-settings,
+html.is-settings body,
+html.is-settings #root {
+  background: #f6f1e7 !important;
+  overflow: auto;
+  min-height: 100%;
+  color: #1c1916;
+  --sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
+  --display: -apple-system, BlinkMacSystemFont, "SF Pro Display", sans-serif;
 }
 
 button,
@@ -279,7 +291,7 @@ button:active:not(:disabled) {
   border: 0;
   text-align: left;
   color: inherit;
-  background: #242428;
+  background: var(--glass-2);
   border-radius: 16px;
   padding: 12px;
   display: flex;
@@ -488,7 +500,7 @@ button:active:not(:disabled) {
   width: 100%;
   flex: 1;
   min-height: 0;
-  background: #17141f;
+  background: var(--glass);
   border-radius: 24px;
   overflow: hidden;
   position: relative;
@@ -508,13 +520,13 @@ button:active:not(:disabled) {
 
 .dock-inv.is-bl {
   left: calc(50% - var(--wrap-w) / 2 - var(--inv));
-  background: radial-gradient(circle at 100% 0, transparent var(--inv), #17141f calc(var(--inv) + 0.6px));
+  background: radial-gradient(circle at 100% 0, transparent var(--inv), var(--glass) calc(var(--inv) + 0.6px));
 }
 
 .dock-inv.is-br {
   right: auto;
   left: calc(50% + var(--wrap-w) / 2);
-  background: radial-gradient(circle at 0 0, transparent var(--inv), #17141f calc(var(--inv) + 0.6px));
+  background: radial-gradient(circle at 0 0, transparent var(--inv), var(--glass) calc(var(--inv) + 0.6px));
 }
 
 .dock-inv {
@@ -904,7 +916,7 @@ button:active:not(:disabled) {
 }
 
 .clip-chip.is-on {
-  background: #242428;
+  background: var(--glass-2);
 }
 
 .clip-chip span {
@@ -942,8 +954,8 @@ button:active:not(:disabled) {
   position: absolute;
   inset: 0;
   background:
-    radial-gradient(1200px 500px at 50% -10%, rgba(90, 70, 50, 0.45), transparent 55%),
-    linear-gradient(180deg, #2a2436 0%, #1a1622 38%, #121018 100%);
+    radial-gradient(900px 420px at 50% -8%, rgba(60, 58, 120, 0.16), transparent 55%),
+    linear-gradient(180deg, #f7f3ea 0%, #efe6d8 48%, #e6dccb 100%);
 }
 
 .wallpaper::after {
@@ -2283,5 +2295,138 @@ button:active:not(:disabled) {
 .skin-chip.is-on {
   color: var(--text);
   background: var(--glass-2);
-  border-color: var(--line-strong);
+  border-color: var(--iris);
+}
+
+.settings-inline {
+  width: 100%;
+  height: 100%;
+  overflow: auto;
+  background: var(--glass);
+  color: var(--text);
+}
+
+.settings-inline > .btn {
+  margin: 12px 12px 0;
+}
+
+.settings {
+  max-width: 520px;
+  margin: 0 auto;
+  padding: 28px 28px 48px;
+}
+
+.settings-head h1 {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 650;
+  letter-spacing: -0.03em;
+}
+
+.settings-head p {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.45;
+  max-width: 42ch;
+}
+
+.settings section {
+  margin-top: 28px;
+}
+
+.settings h2 {
+  margin: 0 0 10px;
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.seg {
+  display: inline-flex;
+  padding: 3px;
+  border-radius: 10px;
+  background: var(--glass-2);
+  margin-bottom: 8px;
+}
+
+.seg button {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  height: 28px;
+  padding: 0 14px;
+  border-radius: 8px;
+  font-size: 13px;
+}
+
+.seg button.is-on {
+  background: var(--iris);
+  color: #fff;
+}
+
+.pref {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 0;
+  border-top: 1px solid var(--line);
+}
+
+.pref strong {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.pref em {
+  display: block;
+  margin-top: 2px;
+  font-style: normal;
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.4;
+}
+
+.pref input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--iris);
+}
+
+.perm {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px 12px;
+  padding: 14px 0;
+  border-top: 1px solid var(--line);
+}
+
+.perm strong {
+  font-size: 14px;
+}
+
+.perm p {
+  margin: 2px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.perm .ok,
+.perm .need {
+  font-size: 12px;
+  align-self: center;
+}
+
+.perm .ok {
+  color: #3dbe8c;
+}
+
+.perm .need {
+  color: var(--copper);
+}
+
+.perm .btn {
+  justify-self: start;
 }

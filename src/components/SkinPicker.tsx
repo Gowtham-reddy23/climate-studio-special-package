@@ -3,7 +3,7 @@ import type { Skin } from "../types";
 
 const SKINS: { id: Skin; label: string }[] = [
   { id: "glass", label: "Glass" },
-  { id: "dark", label: "Dark" },
+  { id: "dark", label: "Paper" },
   { id: "light", label: "Light" },
   { id: "mat", label: "Mat" },
 ];
