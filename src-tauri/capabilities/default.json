@@ -1,0 +1,11 @@
+{
+  "identifier": "default",
+  "description": "Cove window",
+  "windows": ["main"],
+  "permissions": [
+    "core:default",
+    "core:event:allow-listen",
+    "core:window:allow-set-size",
+    "core:window:allow-set-position"
+  ]
+}

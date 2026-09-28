@@ -1,0 +1,46 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Cove",
+  "version": "0.1.0",
+  "identifier": "com.cove.kept",
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "devUrl": "http://localhost:5173",
+    "beforeBuildCommand": "npm run build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "Cove",
+        "width": 196,
+        "height": 32,
+        "decorations": false,
+        "transparent": true,
+        "alwaysOnTop": true,
+        "resizable": false,
+        "fullscreen": false,
+        "shadow": false,
+        "visibleOnAllWorkspaces": true,
+        "skipTaskbar": true,
+        "hiddenTitle": true,
+        "acceptFirstMouse": true,
+        "focus": false,
+        "visible": true
+      }
+    ],
+    "security": {
+      "csp": null
+    },
+    "macOSPrivateApi": true
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["dmg", "app"],
+    "macOS": {
+      "minimumSystemVersion": "13.0"
+    },
+    "icon": ["icons/32x32.png", "icons/128x128.png", "icons/icon.png", "icons/icon.icns"]
+  }
+}
