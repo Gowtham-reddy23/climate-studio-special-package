@@ -197,6 +197,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
             focusLog: Array.isArray(parsed.focusLog) ? parsed.focusLog : seed.focusLog,
           },
         });
+      void import("./blobDb").then(({ pruneBlobs }) =>
+        pruneBlobs((parsed.clips ?? []).map((c) => c.id)),
+      );
     } catch {
       /* keep seed */
     }

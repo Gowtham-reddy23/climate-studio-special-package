@@ -32,6 +32,30 @@ export async function loadBlob(id: string): Promise<Blob | null> {
   });
 }
 
+export async function deleteBlob(id: string): Promise<void> {
+  const db = await openDb();
+  await new Promise<void>((resolve, reject) => {
+    const tx = db.transaction(STORE, "readwrite");
+    tx.objectStore(STORE).delete(id);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+export async function pruneBlobs(validIds: string[]): Promise<number> {
+  const keep = new Set(validIds);
+  const db = await openDb();
+  const keys: IDBValidKey[] = await new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE, "readonly");
+    const req = tx.objectStore(STORE).getAllKeys();
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+  const orphans = keys.filter((k) => typeof k === "string" && !keep.has(k)) as string[];
+  await Promise.all(orphans.map((k) => deleteBlob(k)));
+  return orphans.length;
+}
+
 export const saveAudio = saveBlob;
 export const loadAudio = loadBlob;
 
