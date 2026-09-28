@@ -1,4 +1,5 @@
 mod agents;
+mod calendar;
 mod ocr;
 mod paste;
 mod removebg;
@@ -395,7 +396,8 @@ pub fn run() {
       quit_cove,
       ocr::ocr_image,
       paste::set_paste_slots,
-      removebg::remove_bg
+      removebg::remove_bg,
+      calendar::calendar_events
     ])
     .setup(|app| {
       #[cfg(target_os = "macos")]

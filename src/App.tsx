@@ -5,7 +5,7 @@ import { Roux } from "./components/Pebble";
 import { Waveform } from "./components/Waveform";
 import { useRecorder } from "./hooks/useRecorder";
 import { classify, formatClock, formatDay, formatTime, isSecret, todayKey } from "./lib";
-import { isNativeApp, listenNativeClipboard, listenSkipPaste, ocrImage, quitCove, syncPasteSlots, syncWindow } from "./native";
+import { calendarEvents, isNativeApp, listenNativeClipboard, listenSkipPaste, ocrImage, quitCove, syncPasteSlots, syncWindow } from "./native";
 import { makeClip, useStore } from "./store";
 import { useIsland } from "./island/useIsland";
 import type { ClipKind, Mood, Tab } from "./types";
@@ -188,6 +188,17 @@ export function App() {
   useEffect(() => {
     document.documentElement.dataset.skin = state.skin;
   }, [state.skin]);
+
+  const gotEvents = useRef(false);
+  useEffect(() => {
+    if (!isNativeApp() || gotEvents.current) return;
+    void calendarEvents().then((events) => {
+      if (events && events.length) {
+        gotEvents.current = true;
+        dispatch({ type: "set-events", events });
+      }
+    });
+  }, [dispatch, open]);
 
   useEffect(() => {
     let stop = () => undefined as void;

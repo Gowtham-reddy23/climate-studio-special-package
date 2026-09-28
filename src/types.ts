@@ -122,4 +122,5 @@ export type Action =
   | { type: "focus-stop" }
   | { type: "secret-blocked" }
   | { type: "set-layout"; layout: DockLayout }
-  | { type: "set-skin"; skin: Skin };
+  | { type: "set-skin"; skin: Skin }
+  | { type: "set-events"; events: CalendarEvent[] };

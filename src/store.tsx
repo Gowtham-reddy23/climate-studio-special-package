@@ -168,6 +168,8 @@ function reduce(state: AppState, action: Action): AppState {
       return { ...state, layout: action.layout };
     case "set-skin":
       return { ...state, skin: action.skin };
+    case "set-events":
+      return { ...state, events: action.events };
     default:
       return state;
   }

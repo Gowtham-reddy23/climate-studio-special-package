@@ -84,6 +84,19 @@ export async function ocrImage(blob: Blob): Promise<string | null> {
   }
 }
 
+export type NativeCalEvent = { id: string; title: string; start: string; end: string; calendar: string };
+
+export async function calendarEvents(): Promise<NativeCalEvent[] | null> {
+  if (!isNativeApp()) return null;
+  try {
+    const { invoke } = await import("@tauri-apps/api/core");
+    const events = await invoke<NativeCalEvent[]>("calendar_events");
+    return Array.isArray(events) ? events.filter((e) => e.title && e.start) : null;
+  } catch {
+    return null;
+  }
+}
+
 export async function removeBackground(blob: Blob): Promise<Blob | null> {
   if (!isNativeApp()) return null;
   try {
