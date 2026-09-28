@@ -2263,6 +2263,15 @@ button:active:not(:disabled) {
   display: inline-flex;
   gap: 4px;
 }
+.prefs-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.skin-chip:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
 .skin-chip {
   padding: 3px 10px;
   border-radius: 999px;

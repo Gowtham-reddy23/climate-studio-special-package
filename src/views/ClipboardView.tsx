@@ -6,7 +6,7 @@ import { SkinPicker } from "../components/SkinPicker";
 import { Waveform } from "../components/Waveform";
 import { pasteFaces } from "../faces";
 import { formatTime, formatWhen } from "../lib";
-import { useStore } from "../store";
+import { makeClip, useStore } from "../store";
 import type { Clip, ClipKind, Craft } from "../types";
 
 const FILTERS: { id: ClipKind | "all"; label: string }[] = [
@@ -30,10 +30,47 @@ export function ClipboardView({
   query: string;
   onCopy: (content: string) => void;
 }) {
-  const { state } = useStore();
+  const { state, dispatch } = useStore();
   const [filter, setFilter] = useState<ClipKind | "all">("all");
   const [board, setBoard] = useState<string | "all">("all");
+  const [mooding, setMooding] = useState(false);
   const q = query.trim().toLowerCase();
+
+  const imageClips = state.clips.filter((c) => c.kind === "image" && c.content.startsWith("data:"));
+
+  const makeMoodboard = async () => {
+    const urls = imageClips.slice(0, 9).map((c) => c.content);
+    if (urls.length < 2 || mooding) return;
+    setMooding(true);
+    try {
+      const { composeMoodboard } = await import("../moodboard");
+      const blob = await composeMoodboard(urls);
+      const { saveBlob, thumbFromBlob } = await import("../blobDb");
+      const clip = makeClip({
+        kind: "image",
+        content: "Moodboard",
+        preview: "Moodboard",
+        pinned: false,
+        board: "Design",
+        source: "Moodboard",
+        meta: {},
+      });
+      clip.meta.imageId = clip.id;
+      await saveBlob(clip.id, blob);
+      try {
+        const t = await thumbFromBlob(blob);
+        clip.content = t.dataUrl;
+        clip.meta.width = t.width;
+        clip.meta.height = t.height;
+        clip.preview = `Moodboard · ${urls.length}`;
+      } catch {
+        /* blob still saved */
+      }
+      dispatch({ type: "add-clip", clip });
+    } finally {
+      setMooding(false);
+    }
+  };
 
   const clips = useMemo(() => {
     return state.clips.filter((c) => {
@@ -59,7 +96,14 @@ export function ClipboardView({
     <>
       <div className="prefs-row">
         <SkinPicker />
-        <BackupButtons />
+        <div className="prefs-actions">
+          {imageClips.length >= 2 ? (
+            <button className="skin-chip" onClick={makeMoodboard} disabled={mooding}>
+              {mooding ? "Composing…" : `Moodboard (${Math.min(imageClips.length, 9)})`}
+            </button>
+          ) : null}
+          <BackupButtons />
+        </div>
       </div>
       {state.lastBlockedAt && Date.now() - state.lastBlockedAt < 8000 ? (
         <div className="secret-banner">Roux covered his eyes. That secret never landed in Kept.</div>
