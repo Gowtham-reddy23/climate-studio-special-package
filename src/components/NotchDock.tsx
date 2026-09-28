@@ -1,5 +1,8 @@
 import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
+import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import { Roux } from "./Pebble";
+import { IslandPill } from "../island/IslandPill";
+import type { IslandView } from "../island/islandModel";
 import { pollAgents, type AgentStatus } from "../native";
 import type { DockLayout, Mood } from "../types";
 
@@ -7,8 +10,7 @@ export function NotchDock({
   open,
   layout,
   mood,
-  live,
-  task,
+  view,
   cueColor,
   onToggle,
   onLayout,
@@ -18,8 +20,7 @@ export function NotchDock({
   open: boolean;
   layout: DockLayout;
   mood: Mood;
-  live: string | null;
-  task: string | null;
+  view: IslandView;
   cueColor?: string;
   onToggle: () => void;
   onLayout: () => void;
@@ -27,6 +28,7 @@ export function NotchDock({
   children?: ReactNode;
 }) {
   const [agents, setAgents] = useState<AgentStatus[]>([]);
+  const reduced = useReducedMotion();
 
   useEffect(() => {
     let alive = true;
@@ -44,7 +46,9 @@ export function NotchDock({
   }, []);
 
   return (
-    <div
+    <motion.div
+      layout
+      transition={reduced ? { duration: 0.12 } : { type: "spring", stiffness: 380, damping: 30 }}
       className={`dock ${open ? "is-open" : "is-idle"}`}
       data-open={open}
       data-layout={layout}
@@ -53,11 +57,16 @@ export function NotchDock({
       <div className="dock-chrome">
         <div className="dock-wing is-left" onClick={() => onToggle()}>
           <Roux mood={mood} size={20} compact cueColor={cueColor} />
-          {live ? (
-            <span className="dock-timer" title={task ?? live}>
-              {live}
-            </span>
-          ) : null}
+          <span className="dock-pills">
+            <AnimatePresence mode="popLayout">
+              {view.persistent ? (
+                <IslandPill key={view.persistent.id} activity={view.persistent} reduced={!!reduced} />
+              ) : null}
+              {view.transient ? (
+                <IslandPill key={view.transient.id} activity={view.transient} reduced={!!reduced} />
+              ) : null}
+            </AnimatePresence>
+          </span>
         </div>
         <div className="dock-camera" onClick={() => onToggle()} aria-hidden="true" />
         <div className="dock-wing is-right">
@@ -91,7 +100,7 @@ export function NotchDock({
           {children}
         </div>
       ) : null}
-    </div>
+    </motion.div>
   );
 }
 

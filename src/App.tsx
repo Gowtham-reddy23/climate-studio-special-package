@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent, type RefObject } from "react";
+import { useCallback, useEffect, useRef, useState, type MouseEvent, type RefObject } from "react";
 import { NotchDock } from "./components/NotchDock";
 import { AgentsStrip } from "./components/AgentsBento";
 import { Roux } from "./components/Pebble";
@@ -7,6 +7,7 @@ import { useRecorder } from "./hooks/useRecorder";
 import { classify, formatClock, formatDay, formatTime, isSecret, todayKey } from "./lib";
 import { isNativeApp, listenNativeClipboard, listenSkipPaste, ocrImage, quitCove, syncPasteSlots, syncWindow } from "./native";
 import { makeClip, useStore } from "./store";
+import { useIsland } from "./island/useIsland";
 import type { ClipKind, Mood, Tab } from "./types";
 import { CalendarView } from "./views/CalendarView";
 import { ClipboardView } from "./views/ClipboardView";
@@ -310,29 +311,12 @@ export function App() {
           ? "copy"
           : "idle";
 
-  const islandLabel = useMemo(() => {
-    if (recorder.recording) {
-      return { hot: true, live: formatTime(recorder.elapsedMs), task: recorder.partial || "Voice note" };
-    }
-    if (state.focus.running) {
-      const task = state.tasks.find((t) => t.id === state.focus.taskId);
-      return {
-        hot: true,
-        live: state.focus.mode === "watch"
-          ? formatMs(state.focus.remainingMs)
-          : formatMs(state.focus.remainingMs),
-        task: task?.title ?? "Focus",
-      };
-    }
-    if (state.lastBlockedAt && Date.now() - state.lastBlockedAt < 4000) {
-      return { hot: true, live: "held", task: "Secret not saved" };
-    }
-    const latest = state.clips[0];
-    if (latest && Date.now() - latest.createdAt < 8000) {
-      return { hot: true, live: latest.kind, task: latest.preview };
-    }
-    return { hot: false, live: null as string | null, task: null as string | null };
-  }, [recorder.elapsedMs, recorder.partial, recorder.recording, state]);
+  const view = useIsland({
+    now,
+    recording: recorder.recording,
+    elapsedMs: recorder.elapsedMs,
+    partial: recorder.partial,
+  });
 
   const onIslandEnter = () => {
     if (closeTimer.current) window.clearTimeout(closeTimer.current);
@@ -442,8 +426,7 @@ export function App() {
               open={open}
               layout={state.layout}
               mood={mood}
-              live={islandLabel.live}
-              task={islandLabel.task}
+              view={view}
               cueColor={mood === "copy" && state.clips[0]?.kind === "color" ? state.clips[0].content : undefined}
               onToggle={() => setOpenMode(!open, false)}
               onLayout={() =>
@@ -481,7 +464,7 @@ export function App() {
           ) : (
             <>
             <button
-              className={`island ${islandLabel.hot || open ? "hot" : ""}`}
+              className={`island ${view.hot || open ? "hot" : ""}`}
               onMouseEnter={onIslandEnter}
               onClick={() => {
                 if (open && pinned) {
@@ -503,8 +486,16 @@ export function App() {
                 cueColor={mood === "copy" && state.clips[0]?.kind === "color" ? state.clips[0].content : undefined}
               />
               <span className="mark">cove</span>
-              {islandLabel.live ? <span className="live">{islandLabel.live}</span> : null}
-              {islandLabel.task ? <span className="live-task">{islandLabel.task}</span> : null}
+              {view.persistent ? (
+                <span className="live">{view.persistent.label}</span>
+              ) : view.transient ? (
+                <span className="live">{view.transient.label}</span>
+              ) : null}
+              {view.persistent?.detail ? (
+                <span className="live-task">{view.persistent.detail}</span>
+              ) : view.transient?.detail ? (
+                <span className="live-task">{view.transient.detail}</span>
+              ) : null}
             </button>
             <CovePanel
               open={open}
@@ -535,11 +526,6 @@ export function App() {
       </div>
     </div>
   );
-}
-
-function formatMs(ms: number) {
-  const s = Math.max(0, Math.round(ms / 1000));
-  return `${Math.floor(s / 60)}:${(s % 60).toString().padStart(2, "0")}`;
 }
 
 function CovePanel({
