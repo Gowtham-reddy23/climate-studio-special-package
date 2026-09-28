@@ -186,6 +186,10 @@ export function App() {
   }, [open, state.layout]);
 
   useEffect(() => {
+    document.documentElement.dataset.skin = state.skin;
+  }, [state.skin]);
+
+  useEffect(() => {
     let stop = () => undefined as void;
     void listenNativeClipboard(
       (text, source) => keep(text, { source }),
