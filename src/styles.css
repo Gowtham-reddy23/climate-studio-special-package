@@ -2158,3 +2158,45 @@ button:active:not(:disabled) {
     right: 16px;
   }
 }
+
+/* ── Dynamic Island pills ─────────────────────────────── */
+.dock-pills {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.island-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--paper, #f3e2c8);
+  background: rgba(255, 255, 255, 0.06);
+  max-width: 200px;
+  overflow: hidden;
+  white-space: nowrap;
+}
+.island-pill-label {
+  font-variant-numeric: tabular-nums;
+}
+.island-pill-detail {
+  opacity: 0.7;
+  text-overflow: ellipsis;
+  overflow: hidden;
+}
+.island-swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  flex: none;
+}
+.island-pill.kind-secret-blocked {
+  color: #ffd9d9;
+  background: rgba(255, 80, 80, 0.14);
+}
+.island-pill.kind-recording {
+  color: #ffe0b0;
+}
