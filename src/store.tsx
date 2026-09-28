@@ -10,6 +10,7 @@ import {
 import { seed } from "./seed";
 import type { Action, AppState, Clip, FocusState } from "./types";
 import { uid } from "./lib";
+import { persist } from "./storage";
 
 const KEY = "cove.v3";
 
@@ -202,7 +203,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    localStorage.setItem(KEY, JSON.stringify(state));
+    persist(KEY, state);
   }, [state]);
 
   const value = useMemo(() => ({ state, dispatch }), [state]);

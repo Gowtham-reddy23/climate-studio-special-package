@@ -47,6 +47,7 @@ export interface Clip {
     tokenName?: string;
     seconds?: number;
     pathName?: string;
+    evicted?: boolean;
   };
 }
 
