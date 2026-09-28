@@ -1,5 +1,6 @@
 import { useMemo, useState, type CSSProperties } from "react";
 import { AudioPlay } from "../components/AudioPlay";
+import { BackupButtons } from "../components/BackupButtons";
 import { ImagePlay } from "../components/ImagePlay";
 import { SkinPicker } from "../components/SkinPicker";
 import { Waveform } from "../components/Waveform";
@@ -56,7 +57,10 @@ export function ClipboardView({
 
   return (
     <>
-      <SkinPicker />
+      <div className="prefs-row">
+        <SkinPicker />
+        <BackupButtons />
+      </div>
       {state.lastBlockedAt && Date.now() - state.lastBlockedAt < 8000 ? (
         <div className="secret-banner">Roux covered his eyes. That secret never landed in Kept.</div>
       ) : null}

@@ -2248,10 +2248,20 @@ button:active:not(:disabled) {
 }
 
 /* ── Skin picker ───────────────────────────────────────── */
+.prefs-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 0 0 8px;
+}
 .skin-picker {
   display: inline-flex;
   gap: 4px;
-  margin: 0 0 8px;
+}
+.backup {
+  display: inline-flex;
+  gap: 4px;
 }
 .skin-chip {
   padding: 3px 10px;
