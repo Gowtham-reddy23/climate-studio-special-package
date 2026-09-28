@@ -175,34 +175,36 @@ function reduce(state: AppState, action: Action): AppState {
 
 const StoreContext = createContext<{ state: AppState; dispatch: Dispatch<Action> } | null>(null);
 
+function loadInitial(): AppState {
+  try {
+    const raw = localStorage.getItem(KEY);
+    if (!raw) return seed;
+    const parsed = JSON.parse(raw) as AppState;
+    if (!parsed?.clips || !parsed?.tasks) return seed;
+    return {
+      ...seed,
+      ...parsed,
+      boards: ["Design", "Edit", "Code", "Life"],
+      layout: parsed.layout === "vertical" ? "vertical" : "horizontal",
+      skin: (["glass", "dark", "light", "mat"] as const).includes(parsed.skin as never)
+        ? (parsed.skin as AppState["skin"])
+        : "dark",
+      focusLog: Array.isArray(parsed.focusLog) ? parsed.focusLog : seed.focusLog,
+    };
+  } catch {
+    return seed;
+  }
+}
+
 export function StoreProvider({ children }: { children: ReactNode }) {
-  const [state, dispatch] = useReducer(reduce, seed);
+  // Load synchronously in the initializer so the persist effect never clobbers
+  // stored data with the seed before an async hydrate can land.
+  const [state, dispatch] = useReducer(reduce, undefined, loadInitial);
 
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem(KEY);
-      if (!raw) return;
-      const parsed = JSON.parse(raw) as AppState;
-      if (parsed?.clips && parsed?.tasks)
-        dispatch({
-          type: "hydrate",
-          state: {
-            ...seed,
-            ...parsed,
-            boards: ["Design", "Edit", "Code", "Life"],
-            layout: parsed.layout === "vertical" ? "vertical" : "horizontal",
-            skin: (["glass", "dark", "light", "mat"] as const).includes(parsed.skin as never)
-              ? (parsed.skin as AppState["skin"])
-              : "dark",
-            focusLog: Array.isArray(parsed.focusLog) ? parsed.focusLog : seed.focusLog,
-          },
-        });
-      void import("./blobDb").then(({ pruneBlobs }) =>
-        pruneBlobs((parsed.clips ?? []).map((c) => c.id)),
-      );
-    } catch {
-      /* keep seed */
-    }
+    void import("./blobDb").then(({ pruneBlobs }) => pruneBlobs(state.clips.map((c) => c.id)));
+    // Runs once on mount; state.clips is the hydrated set.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
