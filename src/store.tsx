@@ -165,6 +165,8 @@ function reduce(state: AppState, action: Action): AppState {
       return { ...state, blockedSecrets: state.blockedSecrets + 1, lastBlockedAt: Date.now() };
     case "set-layout":
       return { ...state, layout: action.layout };
+    case "set-skin":
+      return { ...state, skin: action.skin };
     default:
       return state;
   }
@@ -188,6 +190,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
             ...parsed,
             boards: ["Design", "Edit", "Code", "Life"],
             layout: parsed.layout === "vertical" ? "vertical" : "horizontal",
+            skin: (["glass", "dark", "light", "mat"] as const).includes(parsed.skin as never)
+              ? (parsed.skin as AppState["skin"])
+              : "dark",
             focusLog: Array.isArray(parsed.focusLog) ? parsed.focusLog : seed.focusLog,
           },
         });

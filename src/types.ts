@@ -17,6 +17,8 @@ export type Tab = "today" | "kept" | "tasks" | "focus" | "notes";
 
 export type DockLayout = "horizontal" | "vertical";
 
+export type Skin = "glass" | "dark" | "light" | "mat";
+
 export type Mood = "idle" | "focus" | "listen" | "copy" | "secret";
 
 export interface Clip {
@@ -93,6 +95,7 @@ export interface AppState {
   blockedSecrets: number;
   lastBlockedAt: number | null;
   layout: DockLayout;
+  skin: Skin;
 }
 
 export type Action =
@@ -117,4 +120,5 @@ export type Action =
   | { type: "focus-delta"; ms: number }
   | { type: "focus-stop" }
   | { type: "secret-blocked" }
-  | { type: "set-layout"; layout: DockLayout };
+  | { type: "set-layout"; layout: DockLayout }
+  | { type: "set-skin"; skin: Skin };
