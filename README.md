@@ -1,6 +1,6 @@
 # Alt-AK
 
-Mac notch workspace: persistent clipboard, auto-sorted by type, plus tasks, focus, notes, and calendar in the same island.
+A productivity app for Alt Carbon folks. Persistent clipboard, tasks, focus, notes, and calendar in the notch.
 
 ## Features
 

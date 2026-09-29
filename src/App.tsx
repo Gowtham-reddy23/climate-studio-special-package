@@ -68,20 +68,35 @@ export function App() {
     window.setTimeout(() => setToast(null), 1400);
   }, []);
 
-  useEffect(() => {
-    if (!native) return;
-    void peekUpdate()
-      .then(setUpdateVersion)
-      .catch(() => setUpdateVersion(null));
-  }, [native]);
-
   const runUpdate = useCallback(() => {
+    if (updating) return;
     setUpdating(true);
     void installUpdate().catch(() => {
       setUpdating(false);
       showToast("Update failed");
     });
-  }, [showToast]);
+  }, [showToast, updating]);
+
+  useEffect(() => {
+    if (!native) return;
+    let stop = false;
+    const look = () => {
+      void peekUpdate()
+        .then((version) => {
+          if (stop || !version) return;
+          setUpdateVersion(version);
+          runUpdate();
+        })
+        .catch(() => undefined);
+    };
+    const first = window.setTimeout(look, 2500);
+    const again = window.setInterval(look, 30 * 60 * 1000);
+    return () => {
+      stop = true;
+      window.clearTimeout(first);
+      window.clearInterval(again);
+    };
+  }, [native, runUpdate]);
 
   const keep = useCallback(
     (raw: string, extra?: Parameters<typeof classify>[1]) => {
@@ -236,9 +251,19 @@ export function App() {
     if (!isNativeApp()) return;
     let alive = true;
     const pull = () => {
-      void calendarEvents().then((events) => {
-        if (!alive || !events) return;
-        dispatch({ type: "set-events", events });
+      void calendarEvents().then((snap) => {
+        if (!alive || !snap) return;
+        dispatch({
+          type: "set-google",
+          google: {
+            connected: snap.connected,
+            configured: snap.configured,
+            email: snap.email,
+            error: snap.error ?? "",
+          },
+        });
+        if (snap.connected && snap.error && snap.events.length === 0) return;
+        dispatch({ type: "set-events", events: snap.events });
       });
     };
     pull();

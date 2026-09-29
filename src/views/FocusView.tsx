@@ -2,7 +2,7 @@ import { InsightsCard } from "../components/InsightsCard";
 import { Roux } from "../components/Pebble";
 import { useScreenTime } from "../hooks/useScreenTime";
 import { formatSpent, formatTime } from "../lib";
-import { isNativeApp } from "../native";
+import { isNativeApp, openPrivacy } from "../native";
 import { FOCUS_COPY } from "../seed";
 import { useStore } from "../store";
 import type { FocusLog, FocusState } from "../types";
@@ -17,7 +17,7 @@ export function FocusView() {
   const { state, dispatch } = useStore();
   const display = state.focus.remainingMs;
   const systemTime = useScreenTime();
-  const onScreen = systemTime ?? (isNativeApp() ? null : screenToday(state.focusLog, state.focus));
+  const onScreen = isNativeApp() ? (systemTime.allowed ? systemTime.ms ?? 0 : null) : screenToday(state.focusLog, state.focus);
 
   return (
     <div className="focus-split">
@@ -65,7 +65,12 @@ export function FocusView() {
       <aside className="focus-spent">
         <span>Time spent</span>
         <strong>{onScreen == null ? "—" : formatSpent(onScreen)}</strong>
-        <em>{onScreen == null ? "Needs Full Disk Access" : "Screen Time"}</em>
+        <em>{onScreen == null ? "Full Disk Access is off" : "Screen Time"}</em>
+        {onScreen == null ? (
+          <button type="button" className="btn primary" onClick={() => void openPrivacy("fulldisk")}>
+            Allow access
+          </button>
+        ) : null}
         <InsightsCard />
       </aside>
     </div>

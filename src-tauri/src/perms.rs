@@ -5,6 +5,7 @@ pub struct PermSnapshot {
   pub accessibility: bool,
   pub calendar: String,
   pub microphone: String,
+  pub full_disk: bool,
 }
 
 #[tauri::command]
@@ -13,6 +14,7 @@ pub fn permission_status() -> PermSnapshot {
     accessibility: accessibility_trusted(false),
     calendar: calendar_state(),
     microphone: microphone_state(),
+    full_disk: crate::screentime::screen_time_today().allowed,
   }
 }
 
@@ -31,6 +33,7 @@ pub fn open_privacy(kind: String) {
   let url = match kind.as_str() {
     "calendar" => "x-apple.systempreferences:com.apple.preference.security?Privacy_Calendars",
     "microphone" => "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone",
+    "fulldisk" => "x-apple.systempreferences:com.apple.settings.PrivacySecurity.extension?Privacy_AllFiles",
     _ => "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility",
   };
   let _ = std::process::Command::new("open").arg(url).spawn();

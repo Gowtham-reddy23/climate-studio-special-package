@@ -9,7 +9,7 @@ pub fn install(app: &tauri::App) -> tauri::Result<()> {
     Some(AboutMetadata {
       name: Some("Alt-AK".into()),
       version: Some(env!("CARGO_PKG_VERSION").into()),
-      copyright: Some("Kept in the notch.".into()),
+      copyright: Some("A productivity app for Alt Carbon folks.".into()),
       ..Default::default()
     }),
   )?;

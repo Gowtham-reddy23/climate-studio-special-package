@@ -10,7 +10,7 @@ export function IntroLayer({ onDone }: { onDone: () => void }) {
     <div className="intro-layer" role="dialog" aria-modal="true" aria-labelledby="intro-title">
       <header>
         <strong id="intro-title">Alt-AK</strong>
-        <p>Lives in the camera notch, above the app you are in. Keys 1–4 switch sections.</p>
+        <p>A productivity app for Alt Carbon folks. Keys 1–4 switch sections.</p>
       </header>
       <ul>
         {PLACES.map((place) => (

@@ -103,6 +103,13 @@ export interface CalendarEvent {
   calendar: string;
 }
 
+export interface GoogleLink {
+  connected: boolean;
+  configured: boolean;
+  email: string;
+  error: string;
+}
+
 export interface FocusState {
   running: boolean;
   mode: "pomodoro" | "deep" | "watch";
@@ -147,6 +154,7 @@ export interface AppState {
   clips: Clip[];
   tasks: Task[];
   events: CalendarEvent[];
+  google: GoogleLink;
   notesByDay: Record<string, string>;
   notes: Note[];
   moodBoards: MoodBoard[];
@@ -222,4 +230,5 @@ export type Action =
   | { type: "set-layout"; layout: DockLayout }
   | { type: "set-skin"; skin: Skin }
   | { type: "set-events"; events: CalendarEvent[] }
+  | { type: "set-google"; google: GoogleLink }
   | { type: "set-pref"; key: "hoverOpen" | "showRings" | "showTimer"; value: boolean };

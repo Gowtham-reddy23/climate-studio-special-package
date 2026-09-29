@@ -1,7 +1,18 @@
 import { useEffect, useState } from "react";
 import { BackupButtons } from "./BackupButtons";
 import { AgentRing, statusLine, useAgents } from "./AgentsBento";
-import { appVersion, calendarEvents, openPrivacy, peekUpdate, permissionStatus, requestAccessibility, requestMicrophone, type PermSnapshot } from "../native";
+import {
+  appVersion,
+  googleCalendarConnect,
+  googleCalendarDisconnect,
+  googleCalendarStatus,
+  openPrivacy,
+  peekUpdate,
+  permissionStatus,
+  requestAccessibility,
+  requestMicrophone,
+  type PermSnapshot,
+} from "../native";
 import { useStore } from "../store";
 
 export function SettingsWindow({
@@ -20,6 +31,8 @@ export function SettingsWindow({
   const [perms, setPerms] = useState<PermSnapshot | null>(null);
   const [version, setVersion] = useState("0.1.0");
   const [checked, setChecked] = useState(false);
+  const [googleBusy, setGoogleBusy] = useState(false);
+  const [googleError, setGoogleError] = useState("");
 
   const refresh = () => {
     void permissionStatus().then(setPerms);
@@ -28,7 +41,14 @@ export function SettingsWindow({
   useEffect(() => {
     refresh();
     void appVersion().then(setVersion);
-  }, []);
+    void googleCalendarStatus().then((status) => {
+      if (!status) return;
+      dispatch({
+        type: "set-google",
+        google: { connected: status.connected, configured: status.configured, email: status.email, error: "" },
+      });
+    });
+  }, [dispatch]);
 
   const check = () => {
     setChecked(false);
@@ -110,6 +130,19 @@ export function SettingsWindow({
         </article>
         <article className="perm">
           <div>
+            <strong>Full Disk Access</strong>
+            <p>Today’s Screen Time. Turn Alt-AK on in the list, then reopen the app.</p>
+          </div>
+          <span className={perms?.fullDisk ? "ok" : "need"}>{perms?.fullDisk ? "Allowed" : "Needed"}</span>
+          <button type="button" className="btn primary" onClick={() => void openPrivacy("fulldisk").finally(refresh)}>
+            Allow
+          </button>
+          <button type="button" className="btn ghost" onClick={() => void openPrivacy("fulldisk")}>
+            System Settings
+          </button>
+        </article>
+        <article className="perm">
+          <div>
             <strong>Microphone</strong>
             <p>Voice notes. macOS asks the first time you record.</p>
           </div>
@@ -132,23 +165,67 @@ export function SettingsWindow({
         <article className="perm">
           <div>
             <strong>Google Calendar</strong>
-            <p>Today’s events from Google. iCloud and On My Mac stay out. Add Google under Internet Accounts if the list is empty.</p>
+            <p>
+              {state.google?.connected
+                ? `Reading events for ${state.google.email || "your Google account"}.`
+                : "Opens Google so you can allow calendar access for this account."}
+            </p>
           </div>
-          <span className={perms?.calendar === "allowed" ? "ok" : "need"}>
-            {perms?.calendar === "allowed" ? "Allowed" : perms?.calendar === "denied" ? "Off" : "Needed"}
-          </span>
-          <button
-            type="button"
-            className="btn primary"
-            onClick={() => {
-              void calendarEvents().finally(refresh);
-            }}
-          >
-            Allow
-          </button>
-          <button type="button" className="btn ghost" onClick={() => void openPrivacy("calendar")}>
-            System Settings
-          </button>
+          <span className={state.google?.connected ? "ok" : "need"}>{state.google?.connected ? "Connected" : "Not connected"}</span>
+          {googleError || state.google?.error ? <p className="gcal-error">{googleError || state.google?.error}</p> : null}
+          {state.google?.connected ? (
+            <button
+              type="button"
+              className="btn ghost"
+              disabled={googleBusy}
+              onClick={() => {
+                setGoogleBusy(true);
+                setGoogleError("");
+                void googleCalendarDisconnect()
+                  .then((status) => {
+                    dispatch({
+                      type: "set-google",
+                      google: { connected: status.connected, configured: status.configured, email: status.email, error: "" },
+                    });
+                    dispatch({ type: "set-events", events: [] });
+                  })
+                  .catch((err: unknown) => setGoogleError(explain(err, "Could not disconnect")))
+                  .finally(() => setGoogleBusy(false));
+              }}
+            >
+              Disconnect
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="btn primary"
+              disabled={googleBusy}
+              onClick={() => {
+                setGoogleBusy(true);
+                setGoogleError("");
+                void (async () => {
+                  const snap = await googleCalendarConnect();
+                  dispatch({
+                    type: "set-google",
+                    google: {
+                      connected: snap.connected,
+                      configured: snap.configured,
+                      email: snap.email,
+                      error: snap.error ?? "",
+                    },
+                  });
+                  if (!(snap.error && snap.events.length === 0)) {
+                    dispatch({ type: "set-events", events: snap.events });
+                  }
+                  if (snap.error) setGoogleError(snap.error);
+                })()
+                  .catch((err: unknown) => setGoogleError(explain(err, "Google sign-in failed")))
+                  .finally(() => setGoogleBusy(false));
+              }}
+            >
+              {googleBusy ? "Waiting for Google" : "Sign in with Google"}
+            </button>
+          )}
         </article>
       </section>
 
@@ -159,7 +236,7 @@ export function SettingsWindow({
             <strong>Alt-AK {version}</strong>
             <p>
               {updateVersion
-                ? `Version ${updateVersion} is ready. It downloads, replaces this app, and opens again.`
+                ? `Version ${updateVersion} is downloading. Alt-AK will reopen when it is in.`
                 : checked
                   ? "This is the latest version."
                   : "Looks for a newer version on GitHub."}
@@ -177,6 +254,12 @@ export function SettingsWindow({
       </section>
     </main>
   );
+}
+
+function explain(err: unknown, fallback: string) {
+  if (typeof err === "string" && err.trim()) return err;
+  if (err instanceof Error && err.message.trim()) return err.message;
+  return fallback;
 }
 
 function Pref({

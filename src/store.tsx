@@ -367,6 +367,8 @@ export function reduce(state: AppState, action: Action): AppState {
       return { ...state, [action.key]: action.value };
     case "set-events":
       return { ...state, events: action.events };
+    case "set-google":
+      return { ...state, google: action.google };
     default:
       return state;
   }
@@ -406,12 +408,25 @@ function migrateNotes(notesByDay: AppState["notesByDay"] | undefined) {
   return notes;
 }
 
+function onlyDefaultPins() {
+  return orgPins();
+}
+
 function loadInitial(): AppState {
   try {
     const raw = localStorage.getItem(KEY);
-    if (!raw) return seed;
+    const resetHistory = localStorage.getItem("cove.history-reset") !== "1";
+    if (!raw) {
+      localStorage.setItem("cove.history-reset", "1");
+      return seed;
+    }
     const parsed = JSON.parse(raw) as AppState;
     if (!parsed?.clips || !parsed?.tasks) return seed;
+    const notesByDay = migrateNotes(parsed.notesByDay);
+    if (resetHistory) {
+      notesByDay[new Date().toISOString().slice(0, 10)] = NOTEPAD_COPY;
+      localStorage.setItem("cove.history-reset", "1");
+    }
     return {
       ...seed,
       ...parsed,
@@ -426,13 +441,19 @@ function loadInitial(): AppState {
       hoverOpen: parsed.hoverOpen !== false,
       showRings: parsed.showRings !== false,
       showTimer: parsed.showTimer !== false,
-      notesByDay: migrateNotes(parsed.notesByDay),
+      notesByDay,
       tasks: migrateTasks(Array.isArray(parsed.tasks) ? parsed.tasks : seed.tasks),
       focus: parsed.focus ? { ...seed.focus, ...parsed.focus, taskId: null } : seed.focus,
       focusLog: Array.isArray(parsed.focusLog) ? parsed.focusLog : seed.focusLog,
       water: { ...seed.water, ...(parsed.water ?? {}) },
       events: Array.isArray(parsed.events) ? parsed.events.filter((e) => !["e1", "e2", "e3"].includes(e.id)) : [],
-      clips: mergeOrgPins(parsed.clips),
+      google: {
+        connected: Boolean(parsed.google?.connected),
+        configured: Boolean(parsed.google?.configured),
+        email: parsed.google?.email ?? "",
+        error: parsed.google?.error ?? "",
+      },
+      clips: resetHistory ? onlyDefaultPins() : mergeOrgPins(parsed.clips),
     };
   } catch {
     return seed;
@@ -445,7 +466,16 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(reduce, undefined, loadInitial);
 
   useEffect(() => {
-    void import("./blobDb").then(({ pruneBlobs }) => pruneBlobs(state.clips.map((c) => c.id)));
+    void import("./blobDb").then(({ pruneBlobs }) => {
+      void import("./noteFiles").then(({ noteBlobIds }) => {
+        const ids = [
+          ...state.clips.map((clip) => clip.id),
+          ...Object.values(state.notesByDay ?? {}).flatMap((body) => noteBlobIds(body)),
+          ...(state.notes ?? []).flatMap((note) => noteBlobIds(note.body)),
+        ];
+        return pruneBlobs(ids);
+      });
+    });
     // Runs once on mount; state.clips is the hydrated set.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

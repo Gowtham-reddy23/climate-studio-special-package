@@ -2,5 +2,6 @@ node_modules
 dist
 .DS_Store
 *.local
+src-tauri/google-oauth.json
 
 tsconfig.tsbuildinfo

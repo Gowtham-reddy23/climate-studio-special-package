@@ -18,10 +18,11 @@ export type PermSnapshot = {
   accessibility: boolean;
   calendar: string;
   microphone: string;
+  fullDisk: boolean;
 };
 
 export async function permissionStatus(): Promise<PermSnapshot> {
-  if (!isNativeApp()) return { accessibility: true, calendar: "unavailable", microphone: "unavailable" };
+  if (!isNativeApp()) return { accessibility: true, calendar: "unavailable", microphone: "unavailable", fullDisk: false };
   const { invoke } = await import("@tauri-apps/api/core");
   return invoke<PermSnapshot>("permission_status");
 }
@@ -63,7 +64,7 @@ export async function openLink(url: string) {
   await invoke("open_link", { url: href });
 }
 
-export async function openPrivacy(kind: "accessibility" | "calendar" | "microphone") {
+export async function openPrivacy(kind: "accessibility" | "calendar" | "microphone" | "fulldisk") {
   if (!isNativeApp()) return;
   const { invoke } = await import("@tauri-apps/api/core");
   await invoke("open_privacy", { kind });
@@ -173,23 +174,64 @@ export async function ocrImage(blob: Blob): Promise<string | null> {
 
 export type NativeCalEvent = { id: string; title: string; start: string; end: string; calendar: string };
 
-export async function screenTimeToday(): Promise<number | null> {
+export type GoogleCalendarSnapshot = {
+  connected: boolean;
+  configured: boolean;
+  email: string;
+  error: string | null;
+  events: NativeCalEvent[];
+};
+
+export type GoogleCalendarStatus = {
+  connected: boolean;
+  configured: boolean;
+  email: string;
+};
+
+export async function googleCalendarStatus(): Promise<GoogleCalendarStatus | null> {
   if (!isNativeApp()) return null;
   try {
     const { invoke } = await import("@tauri-apps/api/core");
-    const ms = await invoke<number | null>("screen_time_today");
-    return typeof ms === "number" ? ms : null;
+    return await invoke<GoogleCalendarStatus>("google_calendar_status");
   } catch {
     return null;
   }
 }
 
-export async function calendarEvents(): Promise<NativeCalEvent[] | null> {
+export async function googleCalendarConfigure(clientId: string, clientSecret: string): Promise<GoogleCalendarStatus> {
+  const { invoke } = await import("@tauri-apps/api/core");
+  return invoke<GoogleCalendarStatus>("google_calendar_configure", { clientId, clientSecret });
+}
+
+export async function googleCalendarConnect(): Promise<GoogleCalendarSnapshot> {
+  const { invoke } = await import("@tauri-apps/api/core");
+  return invoke<GoogleCalendarSnapshot>("google_calendar_connect");
+}
+
+export async function googleCalendarDisconnect(): Promise<GoogleCalendarStatus> {
+  const { invoke } = await import("@tauri-apps/api/core");
+  return invoke<GoogleCalendarStatus>("google_calendar_disconnect");
+}
+
+export async function screenTimeToday(): Promise<{ allowed: boolean; milliseconds: number | null }> {
+  if (!isNativeApp()) return { allowed: false, milliseconds: null };
+  try {
+    const { invoke } = await import("@tauri-apps/api/core");
+    const snap = await invoke<{ allowed: boolean; milliseconds: number | null }>("screen_time_today");
+    if (!snap?.allowed || typeof snap.milliseconds !== "number") return { allowed: false, milliseconds: null };
+    return snap;
+  } catch {
+    return { allowed: false, milliseconds: null };
+  }
+}
+
+export async function calendarEvents(): Promise<GoogleCalendarSnapshot | null> {
   if (!isNativeApp()) return null;
   try {
     const { invoke } = await import("@tauri-apps/api/core");
-    const events = await invoke<NativeCalEvent[]>("calendar_events");
-    return Array.isArray(events) ? events.filter((e) => e.title && e.start) : null;
+    const snap = await invoke<GoogleCalendarSnapshot>("google_calendar_events");
+    if (!snap || !Array.isArray(snap.events)) return null;
+    return { ...snap, events: snap.events.filter((event) => event.title && event.start) };
   } catch {
     return null;
   }

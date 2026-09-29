@@ -1,5 +1,6 @@
 mod agents;
 mod calendar;
+mod gcal;
 mod menus;
 mod ocr;
 mod paste;
@@ -614,6 +615,11 @@ pub fn run() {
       paste::set_paste_slots,
       removebg::remove_bg,
       calendar::calendar_events,
+      gcal::google_calendar_status,
+      gcal::google_calendar_configure,
+      gcal::google_calendar_connect,
+      gcal::google_calendar_disconnect,
+      gcal::google_calendar_events,
       screentime::screen_time_today,
       perms::permission_status,
       perms::request_accessibility,

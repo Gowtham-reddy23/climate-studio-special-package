@@ -23,6 +23,7 @@ cd "$ROOT/src-tauri/target/release/bundle/macos"
 rm -f "${APP_NAME}.app.tar.gz" "${APP_NAME}.app.tar.gz.sig"
 tar -czf "${APP_NAME}.app.tar.gz" "${APP_NAME}.app"
 cd "$ROOT"
+unset TAURI_SIGNING_PRIVATE_KEY
 export TAURI_SIGNING_PRIVATE_KEY_PATH="$KEY"
 npx tauri signer sign "$ROOT/src-tauri/target/release/bundle/macos/${APP_NAME}.app.tar.gz"
 

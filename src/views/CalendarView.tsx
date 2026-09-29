@@ -10,10 +10,12 @@ export function CalendarView({ query }: { query: string }) {
     <>
       <div className="section-title">
         <strong>Calendar</strong>
-        <span>Google Calendar</span>
+        <span>{state.google?.email || "Google Calendar"}</span>
       </div>
       {events.length === 0 ? (
-        <div className="empty">No Google Calendar events match.</div>
+        <div className="empty">
+          {state.google?.connected ? "No Google Calendar events match." : "Connect Google Calendar in Settings."}
+        </div>
       ) : (
         events.map((e) => {
           const mins = eventMinutesFromNow(e.start);

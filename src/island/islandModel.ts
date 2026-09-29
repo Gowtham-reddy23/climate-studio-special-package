@@ -79,7 +79,7 @@ export function buildActivities(input: IslandInputs, now: number): IslandActivit
       priority: PRIORITY["focus-timer"],
       persistent: true,
       label: fmt(input.focus.remainingMs),
-      detail: input.focus.taskTitle ?? "Focus",
+      detail: input.focus.taskTitle || undefined,
     });
   }
 

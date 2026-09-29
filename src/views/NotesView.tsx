@@ -1,7 +1,7 @@
-import { useRef, useState } from "react";
-import { NoteToolbar } from "../components/NoteToolbar";
+import { useState } from "react";
+import { NoteEditor } from "../components/NoteEditor";
 import { formatTime } from "../lib";
-import { applyNoteMark, type NoteMark } from "../noteMarks";
+import { splitNote } from "../noteFiles";
 import { Waveform } from "../components/Waveform";
 import { AudioPlay } from "../components/AudioPlay";
 import { todayKey } from "../lib";
@@ -32,7 +32,6 @@ export function NotesView({
   const { state, dispatch } = useStore();
   const day = todayKey();
   const text = state.notesByDay[day] ?? "";
-  const scratchRef = useRef<HTMLTextAreaElement>(null);
   const [openId, setOpenId] = useState<string | null>(null);
   const [filed, setFiled] = useState(false);
   const notes = [...(state.notes ?? [])].sort((a, b) => Number(b.pinned) - Number(a.pinned) || b.updatedAt - a.updatedAt);
@@ -42,18 +41,10 @@ export function NotesView({
   const lists = notes.filter((n) => n.kind === "list");
   const words = text.trim() ? text.trim().split(/\s+/).length : 0;
 
-  const markScratch = (mark: NoteMark) => {
-    const el = scratchRef.current;
-    if (!el) return;
-    const next = applyNoteMark(text, el.selectionStart, el.selectionEnd, mark);
-    dispatch({ type: "set-note", day, text: next.text });
-    restoreSelection(scratchRef, next.start, next.end);
-  };
-
   const filePage = () => {
     const body = text.trim();
     if (!body) return;
-    const line = body.split("\n").map((s) => s.trim()).find(Boolean) ?? "Note";
+    const line = splitNote(body).prose.split("\n").map((s) => s.trim()).find(Boolean) ?? "Note";
     const title = line.length > 64 ? `${line.slice(0, 61)}…` : line;
     const same = pages.find((p) => p.body.trim() === body);
     if (!same) dispatch({ type: "add-note", title, kind: "write", body });
@@ -70,24 +61,14 @@ export function NotesView({
           <span>{words} {words === 1 ? "word" : "words"}</span>
         </header>
         {error ? <p className="ws-empty">{error}</p> : null}
-        <NoteToolbar onMark={markScratch} />
-        <textarea
-          ref={scratchRef}
-          className="scratch-page"
+        <NoteEditor
           value={text}
-          placeholder="Write the page. The first line becomes the title. ⌘↩ turns the current line into a task."
-          onChange={(e) => {
+          placeholder="Write the page. Type / to format, or to add a link, image, or PDF. The first line is the title."
+          onChange={(next) => {
             setFiled(false);
-            dispatch({ type: "set-note", day, text: e.target.value });
+            dispatch({ type: "set-note", day, text: next });
           }}
-          onKeyDown={(e) => {
-            if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
-              e.preventDefault();
-              const pos = e.currentTarget.selectionStart;
-              const line = text.slice(0, pos).split("\n").pop() ?? "";
-              if (line.trim()) dispatch({ type: "add-task", title: line.trim(), when: "today" });
-            }
-          }}
+          onCommandEnter={(line) => dispatch({ type: "add-task", title: line, when: "today" })}
         />
         {pages.length === 0 ? null : (
           <div className="note-stack">
@@ -173,41 +154,20 @@ export function NotesView({
   );
 }
 
-function restoreSelection(ref: { current: HTMLTextAreaElement | null }, start: number, end: number) {
-  requestAnimationFrame(() => {
-    const node = ref.current;
-    if (!node) return;
-    node.focus();
-    node.setSelectionRange(start, end);
-  });
-}
-
 function WriteNote({ note }: { note: Note }) {
   const { dispatch } = useStore();
-  const ref = useRef<HTMLTextAreaElement>(null);
-  const onMark = (mark: NoteMark) => {
-    const el = ref.current;
-    if (!el) return;
-    const next = applyNoteMark(note.body, el.selectionStart, el.selectionEnd, mark);
-    dispatch({ type: "update-note", id: note.id, body: next.text });
-    restoreSelection(ref, next.start, next.end);
-  };
   return (
-    <>
-      <NoteToolbar onMark={onMark} />
-      <textarea
-        ref={ref}
-        value={note.body}
-        placeholder="Write freely. Bullets, numbers, and checks sit on the current line."
-        onChange={(e) => dispatch({ type: "update-note", id: note.id, body: e.target.value })}
-      />
-    </>
+    <NoteEditor
+      value={note.body}
+      placeholder="Type / to format, or to add a link, image, or PDF."
+      onChange={(body) => dispatch({ type: "update-note", id: note.id, body })}
+    />
   );
 }
 
 function taskLine(note: Note) {
-  const line = note.body
-    .split("\n")
+  const line = splitNote(note.body)
+    .prose.split("\n")
     .map((s) => s.replace(/^- \[[ x]\] ?/, "").trim())
     .find(Boolean);
   return line || note.title || "Task";

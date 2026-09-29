@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { NoteToolbar } from "../components/NoteToolbar";
+import { NoteEditor } from "../components/NoteEditor";
 import { useScreenTime } from "../hooks/useScreenTime";
 import { eventMinutesFromNow, formatSpent, formatTime, todayKey, waterIsDue } from "../lib";
-import { isNativeApp } from "../native";
-import { applyNoteMark, type NoteMark } from "../noteMarks";
+import { isNativeApp, openPrivacy } from "../native";
+import { splitNote } from "../noteFiles";
 import { FOCUS_COPY } from "../seed";
 import { useStore } from "../store";
-import type { FocusLog, FocusState, Tab, WaterState } from "../types";
+import type { FocusLog, FocusState, Tab, Task, WaterState } from "../types";
 
 export function TodayView({
   query,
@@ -31,8 +31,8 @@ export function TodayView({
   );
   const [title, setTitle] = useState("");
   const [saved, setSaved] = useState(false);
-  const padRef = useRef<HTMLTextAreaElement>(null);
   const systemTime = useScreenTime();
+  const screenMs = isNativeApp() ? (systemTime.allowed ? systemTime.ms ?? 0 : null) : screenToday(state.focusLog, state.focus);
   const dateLabel = new Date().toLocaleDateString(undefined, { day: "numeric", month: "short" });
   const [, setTick] = useState(0);
   useEffect(() => {
@@ -42,7 +42,6 @@ export function TodayView({
   const water = state.water ?? { goal: 8, count: 0, day: day, intervalMin: 60, lastAt: null };
   const glasses = water.day === day ? water.count : 0;
   const due = waterIsDue(water);
-  const screenMs = systemTime ?? (isNativeApp() ? null : screenToday(state.focusLog, state.focus));
 
   const add = (e: FormEvent) => {
     e.preventDefault();
@@ -50,25 +49,11 @@ export function TodayView({
     setTitle("");
   };
 
-  const markNote = (mark: NoteMark) => {
-    const el = padRef.current;
-    if (!el) return;
-    const next = applyNoteMark(el.value, el.selectionStart, el.selectionEnd, mark);
-    dispatch({ type: "set-note", day, text: next.text });
-    const start = next.start;
-    const end = next.end;
-    requestAnimationFrame(() => {
-      const node = padRef.current;
-      if (!node) return;
-      node.focus();
-      node.setSelectionRange(start, end);
-    });
-  };
-
   const saveNote = () => {
     const text = note.trim();
     if (!text) return;
-    dispatch({ type: "add-note", title: dateLabel, kind: "write", body: text });
+    const prose = splitNote(text).prose.trim();
+    dispatch({ type: "add-note", title: prose.split("\n").find(Boolean)?.slice(0, 64) || dateLabel, kind: "write", body: text });
     setSaved(true);
     window.setTimeout(() => setSaved(false), 1200);
   };
@@ -81,10 +66,36 @@ export function TodayView({
           <strong>Focus</strong>
           <span>{state.focus.running ? "Running" : "Ready"}</span>
         </header>
-        <time>{formatTime(state.focus.remainingMs)}</time>
+        <div className="ws-timer-step">
+          <button
+            type="button"
+            className="timer-diamond"
+            aria-label="Remove 5 minutes"
+            onClick={() =>
+              state.focus.running
+                ? dispatch({ type: "focus-add", minutes: -5 })
+                : dispatch({ type: "focus-set", durationMs: state.focus.remainingMs - 5 * 60 * 1000 })
+            }
+          >
+            <span>−</span>
+          </button>
+          <time>{formatTime(state.focus.remainingMs)}</time>
+          <button
+            type="button"
+            className="timer-diamond"
+            aria-label="Add 5 minutes"
+            onClick={() =>
+              state.focus.running
+                ? dispatch({ type: "focus-add", minutes: 5 })
+                : dispatch({ type: "focus-set", durationMs: state.focus.remainingMs + 5 * 60 * 1000 })
+            }
+          >
+            <span>+</span>
+          </button>
+        </div>
         <p>{FOCUS_COPY}</p>
         <div className="ws-timer-presets">
-          {[15, 25, 40].map((m) => (
+          {[15, 25, 45].map((m) => (
             <button
               key={m}
               type="button"
@@ -95,30 +106,6 @@ export function TodayView({
               {m}m
             </button>
           ))}
-          <button
-            type="button"
-            className="btn ghost"
-            aria-label="Remove 5 minutes"
-            onClick={() =>
-              state.focus.running
-                ? dispatch({ type: "focus-add", minutes: -5 })
-                : dispatch({ type: "focus-set", durationMs: state.focus.remainingMs - 5 * 60 * 1000 })
-            }
-          >
-            −
-          </button>
-          <button
-            type="button"
-            className="btn ghost"
-            aria-label="Add 5 minutes"
-            onClick={() =>
-              state.focus.running
-                ? dispatch({ type: "focus-add", minutes: 5 })
-                : dispatch({ type: "focus-set", durationMs: state.focus.remainingMs + 5 * 60 * 1000 })
-            }
-          >
-            +
-          </button>
         </div>
         <div className="ws-timer-start">
           {state.focus.running ? (
@@ -153,7 +140,12 @@ export function TodayView({
           <span>Today</span>
         </header>
         <time>{screenMs == null ? "—" : formatSpent(screenMs)}</time>
-        <p>{screenMs == null ? "Needs Full Disk Access" : "Screen Time"}</p>
+        <p>{screenMs == null ? "Full Disk Access is off" : "Screen Time"}</p>
+        {screenMs == null ? (
+          <button type="button" className="btn primary" onClick={() => void openPrivacy("fulldisk")}>
+            Allow access
+          </button>
+        ) : null}
       </section>
       </div>
 
@@ -181,38 +173,7 @@ export function TodayView({
                   {t.remindAt && !t.done ? <em>Remind {clock(t.remindAt)}</em> : null}
                 </span>
               </div>
-              {t.done ? null : (
-                <span className="ws-micro">
-                  <button
-                    type="button"
-                    title="Start a 25 minute focus"
-                    onClick={() =>
-                      dispatch({
-                        type: "focus-start",
-                        mode: "pomodoro",
-                        taskId: null,
-                        durationMs: (t.limitMin ?? 25) * 60 * 1000,
-                      })
-                    }
-                  >
-                    Focus
-                  </button>
-                  <button
-                    type="button"
-                    title="Remind in 30 minutes"
-                    onClick={() => dispatch({ type: "set-task", id: t.id, remindAt: Date.now() + 30 * 60 * 1000 })}
-                  >
-                    Remind
-                  </button>
-                  <button
-                    type="button"
-                    title="Save this task as a note"
-                    onClick={() => dispatch({ type: "add-note", title: t.title, kind: "write", body: t.detail?.trim() || t.title })}
-                  >
-                    Note
-                  </button>
-                </span>
-              )}
+              <TaskMore task={t} />
             </li>
           ))}
         </ul>
@@ -230,12 +191,10 @@ export function TodayView({
           <strong>Notepad</strong>
           <span>{dateLabel}</span>
         </header>
-        <NoteToolbar onMark={markNote} />
-        <textarea
-          ref={padRef}
+        <NoteEditor
           value={note}
-          placeholder="Write the thought down. Use the list buttons for bullets, numbers, or checks."
-          onChange={(e) => dispatch({ type: "set-note", day, text: e.target.value })}
+          placeholder="Write the thought down. Type / to format, or to add a link, image, or PDF."
+          onChange={(text) => dispatch({ type: "set-note", day, text })}
         />
         <footer>
           <span>{words} {words === 1 ? "word" : "words"}</span>
@@ -256,7 +215,16 @@ export function TodayView({
           <strong>Events</strong>
           <span>Google</span>
         </header>
-        {events.length === 0 ? <p className="ws-empty">Nothing on Google Calendar.</p> : null}
+        {events.length === 0 ? (
+          <p className="ws-empty">
+            {state.google?.connected ? "Nothing on Google Calendar." : "Sign in with Google to show events."}
+          </p>
+        ) : null}
+        {state.google?.connected || events.length > 0 ? null : (
+          <button type="button" className="btn primary" onClick={() => window.dispatchEvent(new Event("cove-settings"))}>
+            Sign in with Google
+          </button>
+        )}
         <ul className="ws-events">
           {events.slice(0, 4).map((e) => {
             const mins = eventMinutesFromNow(e.start);
@@ -264,7 +232,7 @@ export function TodayView({
               <li key={e.id}>
                 <strong>{e.title}</strong>
                 <em>
-                  {e.start}–{e.end}
+                  {e.end ? `${e.start}–${e.end}` : e.start}
                   {mins > 0 ? ` · in ${Math.round(mins)}m` : mins > -30 ? " · now" : ""}
                 </em>
               </li>
@@ -304,6 +272,77 @@ export function TodayView({
       </section>
       </div>
     </div>
+  );
+}
+
+function TaskMore({ task }: { task: Task }) {
+  const { dispatch } = useStore();
+  const [open, setOpen] = useState(false);
+  const root = useRef<HTMLSpanElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onPointer = (event: MouseEvent) => {
+      if (!root.current?.contains(event.target as Node)) setOpen(false);
+    };
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setOpen(false);
+    };
+    window.addEventListener("mousedown", onPointer);
+    window.addEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("mousedown", onPointer);
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  const run = (action: () => void) => {
+    action();
+    setOpen(false);
+  };
+
+  return (
+    <span className="task-more" ref={root}>
+      <button type="button" className="task-more-btn" aria-label="More" aria-expanded={open} onClick={() => setOpen((value) => !value)}>
+        •••
+      </button>
+      {open ? (
+        <div className="task-more-menu" role="menu">
+          <button
+            type="button"
+            role="menuitem"
+            onClick={() =>
+              run(() =>
+                dispatch({
+                  type: "focus-start",
+                  mode: "pomodoro",
+                  taskId: null,
+                  durationMs: (task.limitMin ?? 25) * 60 * 1000,
+                }),
+              )
+            }
+          >
+            Focus
+          </button>
+          <button
+            type="button"
+            role="menuitem"
+            onClick={() => run(() => dispatch({ type: "set-task", id: task.id, remindAt: Date.now() + 30 * 60 * 1000 }))}
+          >
+            Remind
+          </button>
+          <button
+            type="button"
+            role="menuitem"
+            onClick={() =>
+              run(() => dispatch({ type: "add-note", title: task.title, kind: "write", body: task.detail?.trim() || task.title }))
+            }
+          >
+            Note
+          </button>
+        </div>
+      ) : null}
+    </span>
   );
 }
 
