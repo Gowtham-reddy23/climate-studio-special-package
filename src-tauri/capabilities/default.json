@@ -1,6 +1,6 @@
 {
   "identifier": "default",
-  "description": "Climate Studio Special Package window",
+  "description": "Alt-AK window",
   "windows": ["main", "settings"],
   "permissions": [
     "core:default",

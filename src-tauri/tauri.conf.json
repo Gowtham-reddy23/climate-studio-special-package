@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Climate Studio Special Package",
+  "productName": "Alt-AK",
   "version": "0.1.0",
   "identifier": "com.cove.kept",
   "build": {
@@ -13,7 +13,7 @@
     "windows": [
       {
         "label": "main",
-        "title": "Climate Studio Special Package",
+        "title": "Alt-AK",
         "width": 196,
         "height": 32,
         "decorations": false,

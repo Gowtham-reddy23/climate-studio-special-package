@@ -1,8 +1,8 @@
 [package]
 name = "cove"
 version = "0.1.0"
-description = "Climate Studio Special Package — kept in the notch"
-authors = ["Climate Studio"]
+description = "Alt-AK — kept in the notch"
+authors = ["Alt-AK"]
 edition = "2021"
 
 [lib]

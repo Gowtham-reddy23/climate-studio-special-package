@@ -16,7 +16,7 @@ export TAURI_SIGNING_PRIVATE_KEY_PASSWORD=""
 cd "$ROOT"
 npm run dmg
 
-APP_NAME="Climate Studio Special Package"
+APP_NAME="Alt-AK"
 APP="$ROOT/src-tauri/target/release/bundle/macos/${APP_NAME}.app"
 codesign --force --deep --sign - "$APP"
 cd "$ROOT/src-tauri/target/release/bundle/macos"
@@ -32,15 +32,15 @@ from datetime import datetime, timezone
 root, repo = sys.argv[1], sys.argv[2]
 conf = json.loads(pathlib.Path(root, "src-tauri/tauri.conf.json").read_text())
 version = conf["version"]
-sig = pathlib.Path(root, "src-tauri/target/release/bundle/macos/Climate Studio Special Package.app.tar.gz.sig").read_text().strip()
+sig = pathlib.Path(root, "src-tauri/target/release/bundle/macos/Alt-AK.app.tar.gz.sig").read_text().strip()
 doc = {
     "version": version,
-    "notes": f"Climate Studio Special Package {version}",
+    "notes": f"Alt-AK {version}",
     "pub_date": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
     "platforms": {
         "darwin-aarch64": {
             "signature": sig,
-            "url": f"https://github.com/{repo}/releases/download/v{version}/Climate%20Studio%20Special%20Package.app.tar.gz",
+            "url": f"https://github.com/{repo}/releases/download/v{version}/Alt-AK.app.tar.gz",
         }
     },
 }
@@ -51,5 +51,5 @@ PY
 
 VERSION="$(python3 -c 'import json; print(json.load(open("src-tauri/tauri.conf.json"))["version"])')"
 cd "$ROOT/src-tauri/target/release/bundle/macos"
-gh release create "v$VERSION" --repo "$REPO" --title "Climate Studio Special Package $VERSION" --notes "Climate Studio Special Package $VERSION" latest.json "Climate Studio Special Package.app.tar.gz"
+gh release create "v$VERSION" --repo "$REPO" --title "Alt-AK $VERSION" --notes "Alt-AK $VERSION" latest.json "Alt-AK.app.tar.gz"
 echo "Published v$VERSION"

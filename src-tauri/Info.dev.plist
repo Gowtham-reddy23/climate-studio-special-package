@@ -3,12 +3,12 @@
 <plist version="1.0">
 <dict>
 	<key>NSCalendarsFullAccessUsageDescription</key>
-	<string>Climate Studio Special Package shows your upcoming events in the notch.</string>
+	<string>Alt-AK shows your upcoming events in the notch.</string>
 	<key>NSCalendarsUsageDescription</key>
-	<string>Climate Studio Special Package shows your upcoming events in the notch.</string>
+	<string>Alt-AK shows your upcoming events in the notch.</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>Climate Studio Special Package records voice notes in the notch.</string>
+	<string>Alt-AK records voice notes in the notch.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
-	<string>Climate Studio Special Package turns voice notes into text.</string>
+	<string>Alt-AK turns voice notes into text.</string>
 </dict>
 </plist>

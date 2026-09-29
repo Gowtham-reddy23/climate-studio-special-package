@@ -425,7 +425,7 @@ export function App() {
             <div className="wallpaper" />
             <header className="menubar">
               <span>
-                <b>Climate Studio Special Package</b> &nbsp; File &nbsp; Edit &nbsp; View
+                <b>Alt-AK</b> &nbsp; File &nbsp; Edit &nbsp; View
               </span>
               <span>
                 {formatDay()} &nbsp; {clock}
@@ -593,7 +593,7 @@ export function App() {
                 setOpenMode(true, false);
               }}
               aria-expanded={open}
-              aria-label="Open Climate Studio Special Package"
+              aria-label="Open Alt-AK"
             >
               {state.focus.running || recorder.recording ? <span className="pulse" /> : null}
               <Roux
@@ -602,7 +602,7 @@ export function App() {
                 compact
                 cueColor={mood === "copy" && state.clips[0]?.kind === "color" ? state.clips[0].content : undefined}
               />
-              <span className="mark">studio</span>
+              <span className="mark">alt-ak</span>
               {view.persistent ? (
                 <span className="live">{view.persistent.label}</span>
               ) : view.transient ? (

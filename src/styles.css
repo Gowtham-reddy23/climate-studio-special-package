@@ -2575,7 +2575,12 @@ button:active:not(:disabled) {
   flex: 1;
 }
 
-.ws-card.is-timer { background: #ddd6f0; align-items: center; text-align: center; }
+.ws-card.is-timer {
+  background: #ddd6f0;
+  align-items: center;
+  text-align: center;
+  overflow: auto;
+}
 .ws-card.is-spent {
   background: #f3e6c8;
   flex: none;
@@ -3195,7 +3200,7 @@ button:active:not(:disabled) {
 }
 
 .ws-card.is-timer time {
-  font-size: clamp(42px, 6vw, 64px);
+  font-size: clamp(32px, 5vw, 52px);
   font-weight: 650;
   letter-spacing: -0.04em;
   font-variant-numeric: tabular-nums;
@@ -3219,11 +3224,20 @@ button:active:not(:disabled) {
 .ws-timer-start {
   margin-top: auto;
   display: flex;
+  flex-wrap: wrap;
   justify-content: center;
+  gap: 6px;
+  width: 100%;
+  flex-shrink: 0;
+  position: sticky;
+  bottom: 0;
+  background: #ddd6f0;
+  padding-top: 4px;
 }
 
 .ws-timer-start .btn {
-  min-width: 96px;
+  min-width: 72px;
+  flex: 1 1 72px;
 }
 
 .ws-more {
@@ -3328,9 +3342,14 @@ button:active:not(:disabled) {
 }
 
 .focus-face {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   text-align: center;
   padding: 12px 8px 8px;
   min-width: 0;
+  min-height: 0;
+  overflow: auto;
 }
 
 .focus-face time {
@@ -3352,11 +3371,85 @@ button:active:not(:disabled) {
   max-width: 320px;
 }
 
+.focus-face .row {
+  flex-wrap: wrap;
+  justify-content: center;
+  width: 100%;
+  flex-shrink: 0;
+  position: sticky;
+  bottom: 0;
+  padding-top: 6px;
+  background: var(--glass, transparent);
+}
+
+.focus-face .row .btn {
+  flex: 1 1 72px;
+}
+
 .modes {
   display: flex;
+  flex-wrap: wrap;
   justify-content: center;
   gap: 6px;
   margin-bottom: 16px;
+}
+
+.note-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.note-tools button {
+  appearance: none;
+  border: 0;
+  background: rgba(255, 255, 255, 0.62);
+  color: #241f18;
+  border-radius: 999px;
+  padding: 4px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.agent-status {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.agent-status li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0;
+  border-top: 1px solid var(--line);
+}
+
+.agent-status li span {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+
+.agent-status strong {
+  font-size: 13px;
+}
+
+.agent-status em,
+.agent-quiet {
+  font-style: normal;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.agent-status b {
+  font-variant-numeric: tabular-nums;
+  font-size: 13px;
 }
 
 .toast {

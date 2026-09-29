@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { BackupButtons } from "./BackupButtons";
+import { AgentRing, statusLine, useAgents } from "./AgentsBento";
 import { appVersion, calendarEvents, openPrivacy, peekUpdate, permissionStatus, requestAccessibility, requestMicrophone, type PermSnapshot } from "../native";
 import { useStore } from "../store";
 
@@ -15,6 +16,7 @@ export function SettingsWindow({
   onChecked?: (version: string | null) => void;
 } = {}) {
   const { state, dispatch } = useStore();
+  const agents = useAgents();
   const [perms, setPerms] = useState<PermSnapshot | null>(null);
   const [version, setVersion] = useState("0.1.0");
   const [checked, setChecked] = useState(false);
@@ -63,11 +65,26 @@ export function SettingsWindow({
           onChange={(value) => dispatch({ type: "set-pref", key: "showTimer", value })}
         />
         <Pref
-          label="Agent rings"
-          detail="Claude, Cursor, and Codex usage beside the camera."
+          label="Agent status"
+          detail="Optional. Claude, Cursor, and Codex beside the camera, and listed here."
           on={state.showRings}
           onChange={(value) => dispatch({ type: "set-pref", key: "showRings", value })}
         />
+        {state.showRings ? (
+          <ul className="agent-status">
+            {agents.length === 0 ? <li className="agent-quiet">No agents reporting yet.</li> : null}
+            {agents.map((agent) => (
+              <li key={agent.id}>
+                <AgentRing agent={agent} size={28} />
+                <span>
+                  <strong>{agent.label}</strong>
+                  <em>{statusLine(agent)}</em>
+                </span>
+                <b>{agent.percent != null ? `${Math.round(agent.percent)}%` : "—"}</b>
+              </li>
+            ))}
+          </ul>
+        ) : null}
       </section>
 
       <section>
@@ -114,8 +131,8 @@ export function SettingsWindow({
         </article>
         <article className="perm">
           <div>
-            <strong>Calendar</strong>
-            <p>Today’s events in the notch. The app only reads them.</p>
+            <strong>Google Calendar</strong>
+            <p>Today’s events from Google. iCloud and On My Mac stay out. Add Google under Internet Accounts if the list is empty.</p>
           </div>
           <span className={perms?.calendar === "allowed" ? "ok" : "need"}>
             {perms?.calendar === "allowed" ? "Allowed" : perms?.calendar === "denied" ? "Off" : "Needed"}
@@ -139,7 +156,7 @@ export function SettingsWindow({
         <h2>Updates</h2>
         <article className="perm">
           <div>
-            <strong>Climate Studio Special Package {version}</strong>
+            <strong>Alt-AK {version}</strong>
             <p>
               {updateVersion
                 ? `Version ${updateVersion} is ready. It downloads, replaces this app, and opens again.`

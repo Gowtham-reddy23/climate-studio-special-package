@@ -5,19 +5,19 @@ pub fn install(app: &tauri::App) -> tauri::Result<()> {
   let h = app.handle();
   let about = PredefinedMenuItem::about(
     h,
-    Some("About Climate Studio Special Package"),
+    Some("About Alt-AK"),
     Some(AboutMetadata {
-      name: Some("Climate Studio Special Package".into()),
+      name: Some("Alt-AK".into()),
       version: Some(env!("CARGO_PKG_VERSION").into()),
       copyright: Some("Kept in the notch.".into()),
       ..Default::default()
     }),
   )?;
   let settings = MenuItem::with_id(h, "settings", "Settings…", true, Some("CmdOrCtrl+,"))?;
-  let quit = PredefinedMenuItem::quit(h, Some("Quit Climate Studio Special Package"))?;
+  let quit = PredefinedMenuItem::quit(h, Some("Quit Alt-AK"))?;
   let perch = Submenu::with_items(
     h,
-    "Climate Studio Special Package",
+    "Alt-AK",
     true,
     &[&about, &settings, &PredefinedMenuItem::separator(h)?, &quit],
   )?;

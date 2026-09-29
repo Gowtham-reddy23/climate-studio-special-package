@@ -93,7 +93,7 @@ fn http_json(method: &str, url: &str, token: &str, extra: &[(&str, &str)], body:
   req = req
     .timeout(Duration::from_secs(5))
     .set("Authorization", &format!("Bearer {token}"))
-    .set("User-Agent", "ClimateStudioSpecialPackage/0.1");
+    .set("User-Agent", "Alt-AK/0.1");
   for (k, v) in extra {
     req = req.set(k, v);
   }

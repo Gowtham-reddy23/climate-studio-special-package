@@ -254,7 +254,7 @@ export function TodayView({
       <section className="ws-card is-events">
         <header>
           <strong>Events</strong>
-          <span>{events.length ? "Today" : "Clear"}</span>
+          <span>Google</span>
         </header>
         {events.length === 0 ? <p className="ws-empty">Nothing on Google Calendar.</p> : null}
         <ul className="ws-events">

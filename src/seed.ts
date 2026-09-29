@@ -215,7 +215,7 @@ export const seed: AppState = {
       board: "Life",
       source: "Screenshot",
       meta: {
-        ocr: "Climate Studio  24:12  Brand review\nKeep this in the island while you work.",
+        ocr: "Alt-AK  24:12  Brand review\nKeep this in the island while you work.",
         width: 1440,
         height: 900,
       },

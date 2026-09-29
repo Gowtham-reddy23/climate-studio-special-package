@@ -1,4 +1,4 @@
-# Climate Studio Special Package
+# Alt-AK
 
 Mac notch workspace: persistent clipboard, auto-sorted by type, plus tasks, focus, notes, and calendar in the same island.
 
@@ -35,7 +35,7 @@ Tiny always-on-top WKWebView. Reads the pasteboard only when it changes (~2 Hz).
 
 ```bash
 npm run desktop   # live
-npm run dmg       # Climate Studio Special Package.app + .dmg
+npm run dmg       # Alt-AK.app + .dmg
 ```
 
 Unsigned local build: right-click the app → Open. The dmg lands in `src-tauri/target/release/bundle/dmg/`.
