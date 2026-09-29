@@ -1,34 +1,42 @@
 import { useCallback, useEffect, useRef, useState, type MouseEvent, type RefObject } from "react";
+import { IntroLayer } from "./components/IntroLayer";
 import { NotchDock } from "./components/NotchDock";
 import { SettingsWindow } from "./components/SettingsWindow";
-import { AgentsStrip } from "./components/AgentsBento";
 import { Roux } from "./components/Pebble";
 import { Waveform } from "./components/Waveform";
 import { useRecorder } from "./hooks/useRecorder";
-import { classify, formatClock, formatDay, formatTime, isSecret, todayKey } from "./lib";
-import { calendarEvents, isNativeApp, listenNativeClipboard, listenSkipPaste, ocrImage, quitCove, syncPasteSlots, syncWindow } from "./native";
+import { classify, formatClock, formatDay, formatTime, isSecret, waterIsDue } from "./lib";
+import { calendarEvents, installUpdate, isNativeApp, listenNativeClipboard, listenSkipPaste, peekUpdate, quitCove, syncPasteSlots, syncWindow } from "./native";
 import { makeClip, useStore } from "./store";
 import { useIsland } from "./island/useIsland";
 import type { ClipKind, Mood, Tab } from "./types";
-import { CalendarView } from "./views/CalendarView";
 import { ClipboardView } from "./views/ClipboardView";
-import { FocusView } from "./views/FocusView";
 import { NotesView } from "./views/NotesView";
 import { TasksView } from "./views/TasksView";
 import { TodayView } from "./views/TodayView";
 
+const INTRO_KEY = "cove.intro";
+
+function introPending() {
+  try {
+    return localStorage.getItem(INTRO_KEY) !== "1";
+  } catch {
+    return false;
+  }
+}
+
 const TABS: { id: Tab; label: string }[] = [
   { id: "today", label: "Today" },
-  { id: "kept", label: "Kept" },
+  { id: "kept", label: "Clipboard" },
   { id: "tasks", label: "Tasks" },
-  { id: "focus", label: "Focus" },
   { id: "notes", label: "Notes" },
 ];
 
 export function App() {
   const { state, dispatch } = useStore();
-  const [open, setOpen] = useState(false);
-  const [pinned, setPinned] = useState(false);
+  const native = isNativeApp();
+  const [open, setOpen] = useState(native);
+  const [pinned, setPinned] = useState(native);
   const [instant, setInstant] = useState(false);
   const [tab, setTab] = useState<Tab>("today");
   const [query, setQuery] = useState("");
@@ -36,17 +44,44 @@ export function App() {
   const [now, setNow] = useState(() => Date.now());
   const [toast, setToast] = useState<string | null>(null);
   const [sheet, setSheet] = useState(false);
+  const [intro, setIntro] = useState(introPending);
+  const [updateVersion, setUpdateVersion] = useState<string | null>(null);
+  const [updating, setUpdating] = useState(false);
   const hoverTimer = useRef<number | null>(null);
   const closeTimer = useRef<number | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
-  const openedByKey = useRef(false);
-  const pinnedRef = useRef(false);
+  const openedByKey = useRef(native);
+  const pinnedRef = useRef(native);
   const recorder = useRecorder();
+
+  const finishIntro = useCallback(() => {
+    try {
+      localStorage.setItem(INTRO_KEY, "1");
+    } catch {
+      /* private mode */
+    }
+    setIntro(false);
+  }, []);
 
   const showToast = useCallback((msg: string) => {
     setToast(msg);
     window.setTimeout(() => setToast(null), 1400);
   }, []);
+
+  useEffect(() => {
+    if (!native) return;
+    void peekUpdate()
+      .then(setUpdateVersion)
+      .catch(() => setUpdateVersion(null));
+  }, [native]);
+
+  const runUpdate = useCallback(() => {
+    setUpdating(true);
+    void installUpdate().catch(() => {
+      setUpdating(false);
+      showToast("Update failed");
+    });
+  }, [showToast]);
 
   const keep = useCallback(
     (raw: string, extra?: Parameters<typeof classify>[1]) => {
@@ -91,16 +126,8 @@ export function App() {
         /* blob still stored */
       }
       dispatch({ type: "add-clip", clip });
-      showToast(ocr ? "Kept screenshot · text read" : "Kept screenshot");
+      showToast("Kept screenshot");
       setTab("kept");
-      if (!ocr) {
-        void ocrImage(blob).then((text) => {
-          if (text) {
-            dispatch({ type: "set-ocr", id: clip.id, ocr: text });
-            showToast("Text read from image");
-          }
-        });
-      }
     },
     [dispatch, showToast],
   );
@@ -128,10 +155,24 @@ export function App() {
         const { saveBlob } = await import("./blobDb");
         await saveBlob(clip.id, result.blob);
       }
+      if (!result.blob && !transcript) {
+        showToast("Nothing to keep");
+        return;
+      }
       dispatch({ type: "add-clip", clip });
-      if (transcript) dispatch({ type: "append-note", day: todayKey(), text: transcript });
-      showToast(transcript ? "Transcribed and kept" : "Audio kept — add the words");
-      setTab("kept");
+      const title = transcript.split(/\s+/).slice(0, 6).join(" ") || "Voice note";
+      dispatch({
+        type: "add-note",
+        title,
+        kind: "write",
+        body: transcript,
+        via: "voice",
+        audioId: result.blob ? clip.id : undefined,
+        durationMs: result.durationMs,
+        peaks: result.peaks,
+      });
+      showToast(result.blob ? "Voice note saved" : "Transcript saved — no audio this time");
+      setTab("notes");
     },
     [dispatch, showToast],
   );
@@ -184,28 +225,35 @@ export function App() {
 
   useEffect(() => {
     document.documentElement.classList.toggle("native", isNativeApp());
-    void syncWindow(open, state.layout);
-  }, [open, state.layout]);
+    void syncWindow(open, sheet ? "settings" : state.layout);
+  }, [open, sheet, state.layout]);
 
   useEffect(() => {
     document.documentElement.dataset.skin = state.skin;
   }, [state.skin]);
 
-  const gotEvents = useRef(false);
   useEffect(() => {
-    if (!isNativeApp() || gotEvents.current) return;
-    void calendarEvents().then((events) => {
-      if (events && events.length) {
-        gotEvents.current = true;
+    if (!isNativeApp()) return;
+    let alive = true;
+    const pull = () => {
+      void calendarEvents().then((events) => {
+        if (!alive || !events) return;
         dispatch({ type: "set-events", events });
-      }
-    });
-  }, [dispatch, open]);
+      });
+    };
+    pull();
+    const id = window.setInterval(pull, 60_000);
+    return () => {
+      alive = false;
+      window.clearInterval(id);
+    };
+  }, [dispatch]);
 
   useEffect(() => {
     let stop = () => undefined as void;
     void listenNativeClipboard(
-      (text, source) => keep(text, { source }),
+      (text, source, kind) =>
+        keep(text, kind === "path" ? { kind: "path", source: source || "Finder" } : { source }),
       (blob, source, ocr) => void keepImage(blob, source, ocr),
     ).then((un) => {
       stop = un;
@@ -254,13 +302,16 @@ export function App() {
     }
   }, [dispatch, showToast, state.focus]);
 
+  const suspendClose = useRef(0);
   const setOpenMode = useCallback((next: boolean, fromKey = false) => {
     openedByKey.current = fromKey;
     setInstant(fromKey);
     setOpen(next);
+    if (next) suspendClose.current = Date.now() + 800;
     if (!next) {
       setPinned(false);
       pinnedRef.current = false;
+      setSheet(false);
     }
   }, []);
 
@@ -310,8 +361,9 @@ export function App() {
         setOpenMode(false, true);
         return;
       }
-      if (!meta && "12345".includes(e.key) && document.activeElement?.tagName !== "INPUT" && document.activeElement?.tagName !== "TEXTAREA") {
-        setTab(TABS[Number(e.key) - 1].id);
+      if (!meta && "1234".includes(e.key) && document.activeElement?.tagName !== "INPUT" && document.activeElement?.tagName !== "TEXTAREA") {
+        const next = TABS[Number(e.key) - 1];
+        if (next) setTab(next.id);
       }
     };
     window.addEventListener("keydown", onKey);
@@ -342,8 +394,18 @@ export function App() {
       setOpenMode(true, true);
       setSheet(true);
     };
+    const onOpen = () => {
+      pinnedRef.current = true;
+      setPinned(true);
+      setSheet(false);
+      setOpenMode(true, true);
+    };
     window.addEventListener("cove-settings", onSheet);
-    return () => window.removeEventListener("cove-settings", onSheet);
+    window.addEventListener("cove-open", onOpen);
+    return () => {
+      window.removeEventListener("cove-settings", onSheet);
+      window.removeEventListener("cove-open", onOpen);
+    };
   }, [setOpenMode]);
 
   const onIslandEnter = () => {
@@ -363,7 +425,7 @@ export function App() {
             <div className="wallpaper" />
             <header className="menubar">
               <span>
-                <b>Cove</b> &nbsp; File &nbsp; Edit &nbsp; View
+                <b>Climate Studio Special Package</b> &nbsp; File &nbsp; Edit &nbsp; View
               </span>
               <span>
                 {formatDay()} &nbsp; {clock}
@@ -446,25 +508,31 @@ export function App() {
           onMouseLeave={() => {
             onIslandLeave();
             closeTimer.current = window.setTimeout(() => {
+              if (Date.now() < suspendClose.current) return;
               if (!pinnedRef.current && !openedByKey.current) setOpenMode(false, false);
-            }, 220);
+            }, 280);
           }}
         >
           {isNativeApp() ? (
             <NotchDock
               open={open}
-              layout={state.layout}
               mood={mood}
               view={view}
               cueColor={mood === "copy" && state.clips[0]?.kind === "color" ? state.clips[0].content : undefined}
-              onToggle={() => setOpenMode(!open, false)}
-              onLayout={() =>
-                dispatch({
-                  type: "set-layout",
-                  layout: state.layout === "vertical" ? "horizontal" : "vertical",
-                })
-              }
+              onToggle={() => {
+                if (open) {
+                  setOpenMode(false, false);
+                  return;
+                }
+                pinnedRef.current = true;
+                setPinned(true);
+                setOpenMode(true, false);
+              }}
               showRings={state.showRings}
+              timer={state.focus.running || state.focus.startedAt ? formatTime(state.focus.remainingMs) : null}
+              waterDue={waterIsDue(state.water, now)}
+              listening={recorder.recording}
+              onMic={() => void toggleListen()}
               onHover={onIslandEnter}
             >
               {sheet ? (
@@ -472,7 +540,12 @@ export function App() {
                   <button type="button" className="btn ghost" onClick={() => setSheet(false)}>
                     Back
                   </button>
-                  <SettingsWindow />
+                  <SettingsWindow
+                    updateVersion={updateVersion}
+                    updating={updating}
+                    onUpdate={runUpdate}
+                    onChecked={setUpdateVersion}
+                  />
                 </div>
               ) : (
               <CovePanel
@@ -497,6 +570,11 @@ export function App() {
                   }
                   setOpenMode(false, false);
                 }}
+                intro={intro}
+                onIntro={finishIntro}
+                updateVersion={updateVersion}
+                updating={updating}
+                onUpdate={runUpdate}
               />
               )}
             </NotchDock>
@@ -515,7 +593,7 @@ export function App() {
                 setOpenMode(true, false);
               }}
               aria-expanded={open}
-              aria-label="Open Cove"
+              aria-label="Open Climate Studio Special Package"
             >
               {state.focus.running || recorder.recording ? <span className="pulse" /> : null}
               <Roux
@@ -524,7 +602,7 @@ export function App() {
                 compact
                 cueColor={mood === "copy" && state.clips[0]?.kind === "color" ? state.clips[0].content : undefined}
               />
-              <span className="mark">cove</span>
+              <span className="mark">studio</span>
               {view.persistent ? (
                 <span className="live">{view.persistent.label}</span>
               ) : view.transient ? (
@@ -558,6 +636,11 @@ export function App() {
                 }
                 setOpenMode(false, false);
               }}
+              intro={intro}
+              onIntro={finishIntro}
+              updateVersion={updateVersion}
+              updating={updating}
+              onUpdate={runUpdate}
             />
             </>
           )}
@@ -580,6 +663,11 @@ function CovePanel({
   onCopy,
   onCancel,
   onClose,
+  intro,
+  onIntro,
+  updateVersion,
+  updating,
+  onUpdate,
 }: {
   open: boolean;
   instant: boolean;
@@ -593,9 +681,15 @@ function CovePanel({
   onCopy: (content: string) => void;
   onCancel: () => void;
   onClose: (e: MouseEvent) => void;
+  intro: boolean;
+  onIntro: () => void;
+  updateVersion: string | null;
+  updating: boolean;
+  onUpdate: () => void;
 }) {
   return (
     <div className="panel" data-open={open} data-instant={instant} aria-hidden={!open}>
+      {intro && open ? <IntroLayer onDone={onIntro} /> : null}
       <div className="panel-head">
         <label className="search">
           <span aria-hidden="true">⌕</span>
@@ -607,14 +701,26 @@ function CovePanel({
           />
         </label>
         <button
-          className={`mic-btn ${recorder.recording ? "is-on" : ""}`}
-          onClick={onListen}
+          className={`mic-btn voice-note ${recorder.recording ? "is-on" : ""}`}
+          onClick={() => {
+            if (!recorder.recording) onListen();
+          }}
           aria-pressed={recorder.recording}
           title="Voice note"
         >
-          mic
+          Voice note
         </button>
-        <button className="mic-btn" title="Close panel · ⌥-click to quit Cove" onClick={onClose}>
+        {recorder.recording ? (
+          <button className="mic-btn voice-end" type="button" onClick={onListen} title="End recording">
+            End
+          </button>
+        ) : null}
+        {updateVersion ? (
+          <button type="button" className="mic-btn update-pill" onClick={onUpdate} disabled={updating}>
+            {updating ? "Updating" : `Update ${updateVersion}`}
+          </button>
+        ) : null}
+        <button className="mic-btn" title="Close panel · ⌥-click to quit" onClick={onClose}>
           ×
         </button>
       </div>
@@ -631,12 +737,10 @@ function CovePanel({
           </button>
         ))}
       </div>
-      {tab !== "today" ? <AgentsStrip /> : null}
       <div className="panel-body">
         {tab === "today" && <TodayView query={query} onOpen={onTab} onCopy={onCopy} />}
         {tab === "kept" && <ClipboardView query={query} onCopy={onCopy} />}
         {tab === "tasks" && <TasksView query={query} />}
-        {tab === "focus" && <FocusView />}
         {tab === "notes" && (
           <NotesView
             recording={recorder.recording}
@@ -650,7 +754,6 @@ function CovePanel({
             onCancel={onCancel}
           />
         )}
-        {tab === "today" ? <CalendarView query={query} /> : null}
       </div>
     </div>
   );

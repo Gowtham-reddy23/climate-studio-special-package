@@ -1,51 +1,40 @@
-import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
+import { type ReactNode } from "react";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import { Roux } from "./Pebble";
 import { IslandPill } from "../island/IslandPill";
 import type { IslandView } from "../island/islandModel";
-import { pollAgents, type AgentStatus } from "../native";
-import type { DockLayout, Mood } from "../types";
+import { AgentRing, useAgents } from "./AgentsBento";
+import type { Mood } from "../types";
 
 export function NotchDock({
   open,
-  layout,
   mood,
   view,
   cueColor,
   onToggle,
-  onLayout,
   onHover,
   showRings,
+  timer,
+  waterDue,
+  listening,
+  onMic,
   children,
 }: {
   open: boolean;
-  layout: DockLayout;
   mood: Mood;
   view: IslandView;
   cueColor?: string;
   onToggle: () => void;
-  onLayout: () => void;
   onHover?: () => void;
   showRings?: boolean;
+  timer?: string | null;
+  waterDue?: boolean;
+  listening?: boolean;
+  onMic?: () => void;
   children?: ReactNode;
 }) {
-  const [agents, setAgents] = useState<AgentStatus[]>([]);
+  const agents = useAgents();
   const reduced = useReducedMotion();
-
-  useEffect(() => {
-    let alive = true;
-    const tick = () => {
-      void pollAgents().then((list) => {
-        if (alive) setAgents(list);
-      });
-    };
-    tick();
-    const id = window.setInterval(tick, 4000);
-    return () => {
-      alive = false;
-      window.clearInterval(id);
-    };
-  }, []);
 
   return (
     <motion.div
@@ -53,86 +42,87 @@ export function NotchDock({
       transition={reduced ? { duration: 0.12 } : { type: "spring", stiffness: 380, damping: 30 }}
       className={`dock ${open ? "is-open" : "is-idle"}`}
       data-open={open}
-      data-layout={layout}
+      data-layout="horizontal"
       onMouseEnter={onHover}
     >
-      <div className="dock-chrome">
-        <div className="dock-wing is-left" onClick={() => onToggle()}>
-          <Roux mood={mood} size={20} compact cueColor={cueColor} />
-          <span className="dock-pills">
-            <AnimatePresence mode="popLayout">
-              {view.persistent ? (
-                <IslandPill key={view.persistent.id} activity={view.persistent} reduced={!!reduced} />
-              ) : null}
-              {view.transient ? (
-                <IslandPill key={view.transient.id} activity={view.transient} reduced={!!reduced} />
-              ) : null}
-            </AnimatePresence>
-          </span>
-        </div>
-        <div className="dock-camera" onClick={() => onToggle()} aria-hidden="true" />
-        <div className="dock-wing is-right">
-          {showRings === false ? null : (
-          <div className="dock-rings" aria-label="Code agents">
-            {agents.map((a) => (
-              <span
-                key={a.id}
-                className={`ring ${a.running ? "is-live" : ""}`}
-                style={ringStyle(a)}
-                title={`${a.label} ${a.running ? "busy" : a.detail || "idle"}`}
-              />
-            ))}
-          </div>
-          )}
-          {open ? (
-            <>
-              <button type="button" className="dock-ico" title="Flip layout" onClick={onLayout}>
-                <LayoutGlyph layout={layout} />
-              </button>
-              <button type="button" className="dock-ico" title="Close · ⌥-click to quit" onClick={() => onToggle()}>
-                <CloseGlyph />
-              </button>
-            </>
-          ) : null}
-        </div>
-      </div>
-
       {open ? (
-        <div className="dock-stage">
-          <i className="dock-inv is-bl" aria-hidden="true" />
-          <i className="dock-inv is-br" aria-hidden="true" />
-          {children}
+        <div className="dock-chrome">
+          <div className="notch-bar" onClick={() => onToggle()}>
+            <Roux mood={mood} size={42} compact cueColor={cueColor} />
+            <span className="dock-pills">
+              <AnimatePresence mode="popLayout">
+                {view.persistent ? (
+                  <IslandPill key={view.persistent.id} activity={view.persistent} reduced={!!reduced} />
+                ) : null}
+                {view.transient ? (
+                  <IslandPill key={view.transient.id} activity={view.transient} reduced={!!reduced} />
+                ) : null}
+              </AnimatePresence>
+            </span>
+            {showRings === false ? null : (
+              <span className="dock-rings" aria-label="Code agents">
+                {agents.map((a) => (
+                  <AgentRing key={a.id} agent={a} size={18} />
+                ))}
+              </span>
+            )}
+          </div>
         </div>
-      ) : null}
+      ) : (
+        <div className="dock-chrome">
+          <div className="dock-wing is-left" />
+          <div className="dock-camera" onClick={() => onToggle()} aria-hidden="true" />
+          <div className="dock-wing is-right">
+            <div className={`notch-side ${timer ? "has-time" : ""} ${waterDue ? "has-sip" : ""}`}>
+              {waterDue ? (
+                <button
+                  type="button"
+                  className="notch-sip"
+                  title="Time for a glass of water"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onToggle();
+                  }}
+                >
+                  <SipGlyph />
+                </button>
+              ) : null}
+              <button
+                type="button"
+                className={`notch-mic ${listening ? "is-on" : ""}`}
+                title={listening ? "Stop voice note" : "Voice note"}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onMic?.();
+                }}
+              >
+                <MicGlyph />
+              </button>
+              {timer ? <span className="notch-time">{timer}</span> : null}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {open ? <div className="dock-stage">{children}</div> : null}
     </motion.div>
   );
 }
 
-function LayoutGlyph({ layout }: { layout: DockLayout }) {
-  return layout === "vertical" ? (
-    <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
-      <rect x="3" y="2" width="10" height="12" rx="2" />
-    </svg>
-  ) : (
-    <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
-      <rect x="1.5" y="4" width="13" height="8" rx="2" />
-    </svg>
-  );
-}
-
-function CloseGlyph() {
+function SipGlyph() {
   return (
-    <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
-      <path d="M4 4l8 8M12 4l-8 8" />
+    <svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true">
+      <path d="M8 2.2c1.8 2.2 3.2 3.8 3.2 5.6a3.2 3.2 0 0 1-6.4 0C4.8 6 6.2 4.4 8 2.2z" />
     </svg>
   );
 }
 
-function ringStyle(a: AgentStatus): CSSProperties {
-  const pct = Math.max(0, Math.min(100, a.percent ?? 0));
-  const color = a.color || "#7c7cff";
-  return {
-    background: `conic-gradient(${color} ${pct}%, #2c2c2e 0)`,
-    ["--ring-color" as string]: color,
-  };
+function MicGlyph() {
+  return (
+    <svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true">
+      <rect x="6" y="1.6" width="4" height="7.2" rx="2" />
+      <path d="M4.2 7.4a3.8 3.8 0 0 0 7.6 0M8 11.2V14" />
+    </svg>
+  );
 }
+

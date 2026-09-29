@@ -1,11 +1,13 @@
 {
   "identifier": "default",
-  "description": "Cove window",
+  "description": "Climate Studio Special Package window",
   "windows": ["main", "settings"],
   "permissions": [
     "core:default",
     "core:event:allow-listen",
     "core:window:allow-set-size",
-    "core:window:allow-set-position"
+    "core:window:allow-set-position",
+    "updater:default",
+    "process:default"
   ]
 }

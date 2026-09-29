@@ -2,10 +2,10 @@ import { useStore } from "../store";
 import type { Skin } from "../types";
 
 const SKINS: { id: Skin; label: string }[] = [
-  { id: "glass", label: "Glass" },
   { id: "dark", label: "Paper" },
+  { id: "mat", label: "Dark" },
   { id: "light", label: "Light" },
-  { id: "mat", label: "Mat" },
+  { id: "glass", label: "Glass" },
 ];
 
 export function SkinPicker() {

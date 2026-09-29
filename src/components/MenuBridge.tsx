@@ -16,8 +16,6 @@ export function MenuBridge() {
       const un = await listen<string>("cove-menu", (ev) => {
         const id = ev.payload;
         const cur = stateRef.current;
-        if (id === "layout-horizontal") dispatch({ type: "set-layout", layout: "horizontal" });
-        if (id === "layout-vertical") dispatch({ type: "set-layout", layout: "vertical" });
         if (id === "toggle-timer") dispatch({ type: "set-pref", key: "showTimer", value: !cur.showTimer });
         if (id === "toggle-rings") dispatch({ type: "set-pref", key: "showRings", value: !cur.showRings });
         if (id === "toggle-hover") dispatch({ type: "set-pref", key: "hoverOpen", value: !cur.hoverOpen });
@@ -26,12 +24,13 @@ export function MenuBridge() {
           const url = URL.createObjectURL(blob);
           const a = document.createElement("a");
           a.href = url;
-          a.download = `cove-backup-${new Date().toISOString().slice(0, 10)}.json`;
+          a.download = `perch-backup-${new Date().toISOString().slice(0, 10)}.json`;
           a.click();
           URL.revokeObjectURL(url);
         }
         if (id === "import") fileRef.current?.click();
         if (id === "settings-inline") window.dispatchEvent(new Event("cove-settings"));
+        if (id === "open-panel") window.dispatchEvent(new Event("cove-open"));
       });
       stop = () => {
         void un();

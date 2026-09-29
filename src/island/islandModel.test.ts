@@ -66,6 +66,14 @@ describe("selectIsland", () => {
     expect(view.transient).toBeNull();
   });
 
+  it("keeps a sip pill until the next glass is logged", () => {
+    const acts = buildActivities({ ...base, water: { due: true, count: 2, goal: 8 } }, 1000);
+    const sip = acts.find((a) => a.kind === "water-sip");
+    expect(sip?.label).toBe("Sip");
+    expect(sip?.detail).toBe("2/8");
+    expect(selectIsland(acts, 1000).transient?.kind).toBe("water-sip");
+  });
+
   it("is not hot when nothing is active", () => {
     expect(selectIsland(buildActivities(base, 1000), 1000).hot).toBe(false);
   });

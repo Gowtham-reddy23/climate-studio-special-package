@@ -1,4 +1,4 @@
-import type { Clip, ClipKind } from "./types";
+import type { Clip, ClipKind, WaterState } from "./types";
 
 const SECRET_PATTERNS = [
   /sk-[a-z]{2,10}-[A-Za-z0-9_-]{16,}/i,
@@ -46,6 +46,15 @@ export function uid(prefix = "id") {
 
 export function todayKey(date = new Date()) {
   return date.toISOString().slice(0, 10);
+}
+
+export function waterIsDue(water: WaterState | undefined, now = Date.now()) {
+  if (!water || water.goal <= 0) return false;
+  const day = todayKey(new Date(now));
+  const count = water.day === day ? water.count : 0;
+  if (count >= water.goal) return false;
+  if (!water.lastAt || water.day !== day) return true;
+  return now >= water.lastAt + water.intervalMin * 60_000;
 }
 
 export function isSecret(text: string) {
@@ -185,10 +194,8 @@ export function classify(content: string, extra?: Partial<Clip>): Omit<Clip, "id
     } else if (TIMECODE_RE.test(text) && text.includes(":")) {
       kind = "timecode";
       meta.seconds = timecodeSeconds(text);
-    } else if (PATH_RE.test(text) || VIDEO_EXT.test(text)) {
+    } else if (text.startsWith("file://") || PATH_RE.test(text) || VIDEO_EXT.test(text)) {
       kind = "path";
-      meta.pathName = text.split("/").pop();
-      meta.fileName = meta.pathName;
     } else if (CODE_RE.test(text)) {
       kind = "code";
       meta.language = guessLanguage(text);
@@ -199,6 +206,19 @@ export function classify(content: string, extra?: Partial<Clip>): Omit<Clip, "id
     meta.language = guessLanguage(text);
   }
 
+  let stored = text;
+  if (kind === "path") {
+    if (text.startsWith("file://")) {
+      try {
+        stored = decodeURIComponent(new URL(text).pathname);
+      } catch {
+        stored = text;
+      }
+    }
+    meta.pathName = meta.pathName ?? stored.split("/").filter(Boolean).pop();
+    meta.fileName = meta.fileName ?? meta.pathName;
+  }
+
   const board = extra?.board ?? craftFor(kind, text, extra?.source);
 
   const preview =
@@ -207,14 +227,14 @@ export function classify(content: string, extra?: Partial<Clip>): Omit<Clip, "id
       : kind === "link"
         ? text.replace(/^https?:\/\//, "")
         : kind === "path"
-          ? (meta.pathName ?? text)
+          ? (meta.pathName ?? stored)
           : kind === "svg"
             ? "SVG"
             : text.split("\n")[0].slice(0, 140);
 
   return {
     kind,
-    content: text,
+    content: stored,
     preview,
     pinned: false,
     board,
@@ -228,6 +248,14 @@ export function formatTime(ms: number) {
   const m = Math.floor(s / 60);
   const r = s % 60;
   return `${m}:${r.toString().padStart(2, "0")}`;
+}
+
+export function formatSpent(ms: number) {
+  const mins = Math.max(0, Math.round(ms / 60000));
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  if (h === 0) return `${m}m`;
+  return `${h}h ${m}m`;
 }
 
 export function formatWhen(ts: number) {

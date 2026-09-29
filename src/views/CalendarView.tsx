@@ -10,10 +10,10 @@ export function CalendarView({ query }: { query: string }) {
     <>
       <div className="section-title">
         <strong>Calendar</strong>
-        <span>On this Mac</span>
+        <span>Google Calendar</span>
       </div>
       {events.length === 0 ? (
-        <div className="empty">No events match.</div>
+        <div className="empty">No Google Calendar events match.</div>
       ) : (
         events.map((e) => {
           const mins = eventMinutesFromNow(e.start);

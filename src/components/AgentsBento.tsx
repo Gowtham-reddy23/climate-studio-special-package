@@ -1,5 +1,14 @@
 import { useEffect, useState } from "react";
 import { pollAgents, type AgentStatus } from "../native";
+import claudeIcon from "../assets/agents/claude.png";
+import cursorIcon from "../assets/agents/cursor.png";
+import codexIcon from "../assets/agents/codex.png";
+
+const AGENT_ICONS: Record<string, string> = {
+  claude: claudeIcon,
+  cursor: cursorIcon,
+  codex: codexIcon,
+};
 
 export function useAgents() {
   const [agents, setAgents] = useState<AgentStatus[]>([]);
@@ -20,7 +29,7 @@ export function useAgents() {
   return agents;
 }
 
-function statusLine(a: AgentStatus) {
+export function statusLine(a: AgentStatus) {
   const n = a.threads ?? 0;
   const thread = n === 1 ? "1 thread" : n > 1 ? `${n} threads` : "";
   if (a.running) return thread ? `busy · ${thread}` : "busy";
@@ -31,17 +40,20 @@ function statusLine(a: AgentStatus) {
 export function AgentRing({ agent, size = 36 }: { agent: AgentStatus; size?: number }) {
   const pct = Math.max(0, Math.min(100, agent.percent ?? 0));
   const color = agent.color || "#7c7cff";
+  const icon = AGENT_ICONS[agent.id];
   return (
     <span
-      className={`ring ${agent.running ? "is-live" : ""}`}
+      className={`ring has-mark ${agent.running ? "is-live" : ""}`}
       style={{
         width: size,
         height: size,
-        background: `conic-gradient(${color} ${pct}%, #2c2c2e 0)`,
+        background: `conic-gradient(${color} ${pct}%, #3a3a3c 0)`,
         ["--ring-color" as string]: color,
       }}
       title={`${agent.label} ${statusLine(agent)}`}
-    />
+    >
+      {icon ? <img src={icon} alt="" /> : null}
+    </span>
   );
 }
 

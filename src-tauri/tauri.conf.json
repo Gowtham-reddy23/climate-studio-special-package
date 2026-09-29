@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Cove",
+  "productName": "Climate Studio Special Package",
   "version": "0.1.0",
   "identifier": "com.cove.kept",
   "build": {
@@ -13,7 +13,7 @@
     "windows": [
       {
         "label": "main",
-        "title": "Cove",
+        "title": "Climate Studio Special Package",
         "width": 196,
         "height": 32,
         "decorations": false,
@@ -35,8 +35,17 @@
     },
     "macOSPrivateApi": true
   },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDE0MTA4QjNEQzA0Rjg2QkIKUldTN2hrL0FQWXNRRkJzNzNacDIrcE0yTlNvNmtYZDVzSk1XSVNjZEFGSzBnUzlORE4xTEptRisK",
+      "endpoints": [
+        "https://github.com/Gowtham-reddy23/perch-updates/releases/latest/download/latest.json"
+      ]
+    }
+  },
   "bundle": {
     "active": true,
+    "createUpdaterArtifacts": true,
     "targets": ["dmg", "app"],
     "macOS": {
       "minimumSystemVersion": "14.0"

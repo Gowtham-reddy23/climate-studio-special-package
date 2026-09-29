@@ -22,6 +22,34 @@ pub struct CalEvent {
   pub calendar: String,
 }
 
+/// Google accounts land in Calendar as CalDAV. iCloud, On My Mac, and Exchange stay out.
+pub fn is_google_source(title: &str, source_type: isize) -> bool {
+  let t = title.to_ascii_lowercase();
+  if t.contains("icloud") || t.contains("on my mac") || t.contains("exchange") || t.contains("birthday") {
+    return false;
+  }
+  if t.contains("google") || t.contains("gmail") || t.contains("googlemail") {
+    return true;
+  }
+  // EKSourceTypeCalDAV. Internet Accounts names a Google login by its email.
+  source_type == 2
+}
+
+#[cfg(test)]
+mod tests {
+  use super::is_google_source;
+
+  #[test]
+  fn keeps_google_and_skips_apple() {
+    assert!(is_google_source("Gmail", 2));
+    assert!(is_google_source("ada@altcarbon.com", 2));
+    assert!(!is_google_source("iCloud", 3));
+    assert!(!is_google_source("On My Mac", 0));
+    assert!(!is_google_source("Exchange", 1));
+    assert!(!is_google_source("Birthdays", 5));
+  }
+}
+
 #[tauri::command]
 pub fn calendar_events() -> Vec<CalEvent> {
   #[cfg(target_os = "macos")]
@@ -121,6 +149,25 @@ unsafe fn read_events() -> Vec<CalEvent> {
     let end_obj: *mut AnyObject = msg_send![ev, endDate];
     let id_obj: *mut AnyObject = msg_send![ev, eventIdentifier];
     let cal_obj: *mut AnyObject = msg_send![ev, calendar];
+    let source: *mut AnyObject = if cal_obj.is_null() {
+      std::ptr::null_mut()
+    } else {
+      msg_send![cal_obj, source]
+    };
+    let source_title: *mut AnyObject = if source.is_null() {
+      std::ptr::null_mut()
+    } else {
+      msg_send![source, title]
+    };
+    let source_type: isize = if source.is_null() {
+      -1
+    } else {
+      msg_send![source, sourceType]
+    };
+    let account = ns_to_string(source_title);
+    if !is_google_source(&account, source_type) {
+      continue;
+    }
     let cal_title: *mut AnyObject = if cal_obj.is_null() {
       std::ptr::null_mut()
     } else {

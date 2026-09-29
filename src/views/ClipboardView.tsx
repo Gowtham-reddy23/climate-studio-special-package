@@ -1,17 +1,17 @@
-import { useMemo, useState, type CSSProperties } from "react";
+import { useMemo, useState } from "react";
 import { AudioPlay } from "../components/AudioPlay";
 import { BackupButtons } from "../components/BackupButtons";
 import { ImagePlay } from "../components/ImagePlay";
-import { SkinPicker } from "../components/SkinPicker";
 import { Waveform } from "../components/Waveform";
 import { pasteFaces } from "../faces";
 import { formatTime, formatWhen } from "../lib";
-import { isNativeApp, removeBackground } from "../native";
+import { isNativeApp, openLink, removeBackground, revealPath } from "../native";
 import { makeClip, useStore } from "../store";
-import type { Clip, ClipKind, Craft } from "../types";
+import type { Clip, ClipKind } from "../types";
 
 const FILTERS: { id: ClipKind | "all"; label: string }[] = [
   { id: "all", label: "All" },
+  { id: "text", label: "Text" },
   { id: "color", label: "Colors" },
   { id: "image", label: "Shots" },
   { id: "svg", label: "SVG" },
@@ -22,8 +22,6 @@ const FILTERS: { id: ClipKind | "all"; label: string }[] = [
   { id: "timecode", label: "Time" },
 ];
 
-const CRAFTS: Craft[] = ["Design", "Edit", "Code", "Life"];
-
 export function ClipboardView({
   query,
   onCopy,
@@ -33,8 +31,8 @@ export function ClipboardView({
 }) {
   const { state, dispatch } = useStore();
   const [filter, setFilter] = useState<ClipKind | "all">("all");
-  const [board, setBoard] = useState<string | "all">("all");
   const [mooding, setMooding] = useState(false);
+  const [activeId, setActiveId] = useState<string | null>(null);
   const q = query.trim().toLowerCase();
 
   const imageClips = state.clips.filter((c) => c.kind === "image" && c.content.startsWith("data:"));
@@ -76,110 +74,99 @@ export function ClipboardView({
   const clips = useMemo(() => {
     return state.clips.filter((c) => {
       if (filter !== "all" && c.kind !== filter) return false;
-      if (board !== "all" && c.board !== board) return false;
       if (!q) return true;
       const hay = `${c.preview} ${c.content} ${c.kind} ${c.board ?? ""} ${c.source} ${c.meta.ocr ?? ""} ${c.meta.colorName ?? ""} ${c.meta.domain ?? ""} ${c.meta.transcript ?? ""} ${c.meta.tokenName ?? ""} ${c.meta.pathName ?? ""}`.toLowerCase();
       return hay.includes(q);
     });
-  }, [board, filter, q, state.clips]);
+  }, [filter, q, state.clips]);
 
   const colors = state.clips.filter((c) => c.kind === "color" || c.kind === "token");
   const pinned = clips.filter((c) => c.pinned);
-  const rest = clips.filter((c) => !c.pinned);
-  const counts = {
-    design: state.clips.filter((c) => c.board === "Design").length,
-    edit: state.clips.filter((c) => c.board === "Edit").length,
-    code: state.clips.filter((c) => c.board === "Code").length,
-    life: state.clips.filter((c) => c.board === "Life").length,
-  };
+
+  const active = clips.find((c) => c.id === activeId) ?? clips[0] ?? null;
 
   return (
     <>
-      <div className="prefs-row">
-        <SkinPicker />
-        <div className="prefs-actions">
-          {imageClips.length >= 2 ? (
-            <button className="skin-chip" onClick={makeMoodboard} disabled={mooding}>
-              {mooding ? "Composing…" : `Moodboard (${Math.min(imageClips.length, 9)})`}
-            </button>
-          ) : null}
-          <BackupButtons />
-        </div>
-      </div>
       {state.lastBlockedAt && Date.now() - state.lastBlockedAt < 8000 ? (
-        <div className="secret-banner">Roux covered his eyes. That secret never landed in Kept.</div>
+        <div className="secret-banner">Roux covered his eyes. That secret never landed in the clipboard.</div>
       ) : null}
+      <div className="clip-board is-hist">
+          <section className="ws-card is-tasks">
+            <header>
+              <strong>History</strong>
+              <span>{clips.length}</span>
+            </header>
+            <div className="ws-kinds">
+              {FILTERS.map((f) => (
+                <button key={f.id} className="chip" aria-pressed={filter === f.id} onClick={() => setFilter(f.id)}>
+                  {f.label}
+                </button>
+              ))}
+            </div>
+            {clips.length === 0 ? <p className="ws-empty">Nothing in this filter.</p> : null}
+            <ul>
+              {clips.map((c) => (
+                <li key={c.id} className={active?.id === c.id ? "is-on" : ""}>
+                  <button className="ws-clip" onClick={() => setActiveId(c.id)}>
+                    <ClipMark clip={c} />
+                    <span>{headline(c)}</span>
+                    <time>{formatWhen(c.createdAt)}</time>
+                  </button>
+                  <button type="button" className="clip-x" title="Delete" onClick={() => dispatch({ type: "remove-clip", id: c.id })}>
+                    ×
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </section>
 
-      {filter === "all" && !q && colors.length > 0 ? (
-        <div className="palette" aria-label="Copied colors">
-          {colors.map((c) => (
-            <button
-              key={c.id}
-              className="swatch-chip"
-              style={{ background: c.kind === "color" ? c.content : c.content.split(":")[1] ?? c.content }}
-              title={c.meta.colorName ?? c.content}
-              onClick={() => onCopy(c.kind === "color" ? c.content : (c.content.split(":")[1] ?? c.content).trim())}
-            />
-          ))}
-        </div>
-      ) : null}
+        <section className="ws-card is-stage">
+          <header>
+            <strong>Preview</strong>
+            <span>{active ? active.kind : "Empty"}</span>
+          </header>
+          {active ? <ClipCard clip={active} onCopy={onCopy} /> : <p className="ws-empty">Copy something and it shows up here.</p>}
+        </section>
 
-      <div className="type-strip">
-        <span>{counts.design} design</span>
-        <span>{counts.edit} edit</span>
-        <span>{counts.code} code</span>
-        <span>{counts.life} life</span>
-      </div>
-
-      <div className="filters">
-        <button className="chip" aria-pressed={board === "all"} onClick={() => setBoard("all")}>
-          Every craft
-        </button>
-        {CRAFTS.map((b) => (
-          <button key={b} className="chip" aria-pressed={board === b} onClick={() => setBoard(b)}>
-            {b}
-          </button>
-        ))}
-      </div>
-      <div className="filters">
-        {FILTERS.map((f) => (
-          <button
-            key={f.id}
-            className="chip"
-            aria-pressed={filter === f.id}
-            onClick={() => setFilter(f.id)}
-          >
-            {f.label}
-          </button>
-        ))}
-      </div>
-
-      {pinned.length > 0 ? (
-        <>
-          <div className="section-title">
+        <section className="ws-card is-pins">
+          <header>
             <strong>Pinned</strong>
-          </div>
-          <div className="rail">
+            <span>{pinned.length}</span>
+          </header>
+          {pinned.length === 0 ? <p className="ws-empty">Pin a clip to keep it here.</p> : null}
+          <ul>
             {pinned.map((c) => (
-              <ClipCard key={c.id} clip={c} onCopy={onCopy} />
+              <li key={c.id} className={active?.id === c.id ? "is-on" : ""}>
+                <button className="ws-clip" onClick={() => setActiveId(c.id)}>
+                  <ClipMark clip={c} />
+                  <span>{headline(c)}</span>
+                </button>
+                <button type="button" className="clip-x" title="Delete" onClick={() => dispatch({ type: "remove-clip", id: c.id })}>
+                  ×
+                </button>
+              </li>
             ))}
-          </div>
-        </>
-      ) : null}
-
-      <div className="section-title">
-        <strong>History</strong>
-        <span>{clips.length}</span>
+          </ul>
+          {colors.length ? (
+            <div className="ws-swatches">
+              {colors.slice(0, 10).map((c) => {
+                const hex = c.kind === "color" ? c.content : (c.content.split(":")[1] ?? c.content).trim();
+                return (
+                  <button key={c.id} style={{ background: hex }} title={c.meta.colorName ?? hex} onClick={() => setActiveId(c.id)} />
+                );
+              })}
+            </div>
+          ) : null}
+          <footer>
+            {imageClips.length >= 2 ? (
+              <button className="ws-more" onClick={makeMoodboard} disabled={mooding}>
+                {mooding ? "…" : "Board"}
+              </button>
+            ) : null}
+            <BackupButtons />
+          </footer>
+        </section>
       </div>
-      {rest.length === 0 && pinned.length === 0 ? (
-        <div className="empty">Nothing in this filter. Copy, paste a screenshot, or ask Roux to listen.</div>
-      ) : (
-        <div className="rail">
-          {rest.map((c) => (
-            <ClipCard key={c.id} clip={c} onCopy={onCopy} />
-          ))}
-        </div>
-      )}
     </>
   );
 }
@@ -187,7 +174,28 @@ export function ClipboardView({
 function ClipCard({ clip, onCopy }: { clip: Clip; onCopy: (content: string) => void }) {
   const { dispatch } = useStore();
   const [cutting, setCutting] = useState(false);
-  const faces = pasteFaces(clip);
+  const [reading, setReading] = useState(false);
+  const [showText, setShowText] = useState(false);
+  const faces = pasteFaces(clip).filter((f) => f.id !== "raw" && !(clip.kind === "image" && f.id === "ocr"));
+
+  const readText = async () => {
+    if (reading) return;
+    setReading(true);
+    try {
+      const { loadBlob } = await import("../blobDb");
+      const { ocrImage } = await import("../native");
+      let src: Blob | null = clip.meta.imageId ? await loadBlob(clip.meta.imageId) : null;
+      if (!src && clip.content.startsWith("data:")) src = await fetch(clip.content).then((r) => r.blob());
+      if (!src) return;
+      const text = await ocrImage(src);
+      if (text) {
+        dispatch({ type: "set-ocr", id: clip.id, ocr: text });
+        setShowText(true);
+      }
+    } finally {
+      setReading(false);
+    }
+  };
 
   const cutOut = async () => {
     if (cutting) return;
@@ -227,91 +235,208 @@ function ClipCard({ clip, onCopy }: { clip: Clip; onCopy: (content: string) => v
     }
   };
 
+  const body = previewText(clip);
+
   return (
-    <article className={`clip is-${clip.kind}`}>
-      {clip.kind === "color" ? (
-        <button className="color-face" style={{ background: clip.content }} onClick={() => onCopy(clip.content)}>
-          <span>{clip.meta.colorName}</span>
-          <b>{clip.content}</b>
-        </button>
-      ) : (
-        <button className="thumb" onClick={() => onCopy(clip.meta.transcript ?? clip.content)} aria-label={`Copy ${clip.kind}`} style={thumbStyle(clip)}>
-          {thumbLabel(clip)}
-        </button>
-      )}
-      {clip.kind !== "color" ? (
-        <div className="body">
-          <div className="title">{headline(clip)}</div>
-          <div className="meta">
-            <span>{clip.kind}</span>
-            <span>{clip.source}</span>
-            <span>{formatWhen(clip.createdAt)}</span>
-            {clip.board ? <span>{clip.board}</span> : null}
-            {clip.kind === "audio" && clip.meta.durationMs ? <span>{formatTime(clip.meta.durationMs)}</span> : null}
-            {clip.kind === "timecode" && clip.meta.seconds != null ? <span>{Math.round(clip.meta.seconds)}s</span> : null}
-          </div>
-          {clip.kind === "audio" ? <Waveform peaks={clip.meta.peaks ?? []} /> : null}
-          {clip.kind === "audio" && clip.meta.audioId ? <AudioPlay id={clip.meta.audioId} /> : null}
-          {clip.kind === "image" ? <ImagePlay id={clip.meta.imageId} fallback={clip.content} /> : null}
-          {clip.kind === "svg" ? (
-            <img className="shot svg-shot" alt="" src={`data:image/svg+xml;utf8,${encodeURIComponent(clip.content)}`} />
-          ) : null}
-          {clip.kind === "code" ? <pre className="code-peek">{clip.content.split("\n").slice(0, 3).join("\n")}</pre> : null}
-          {clip.meta.ocr ? <div className="ocr">{clip.meta.ocr}</div> : null}
-          {clip.kind === "audio" ? (
-            <textarea
-              className="transcript"
-              defaultValue={clip.meta.transcript ?? ""}
-              placeholder="Edit the transcript"
-              onBlur={(e) => dispatch({ type: "set-transcript", id: clip.id, transcript: e.target.value })}
-            />
-          ) : null}
-          <div className="faces">
-            {faces.map((f) => (
-              <button key={f.id} className="face" onClick={() => onCopy(f.value)} title={f.value}>
-                {f.label}
-              </button>
-            ))}
-          </div>
-        </div>
-      ) : (
-        <div className="body">
-          <div className="meta">
-            <span>{clip.source}</span>
-            <span>{formatWhen(clip.createdAt)}</span>
-            {clip.board ? <span>{clip.board}</span> : null}
-          </div>
-          <div className="faces">
-            {faces.map((f) => (
-              <button key={f.id} className="face" onClick={() => onCopy(f.value)} title={f.value}>
-                {f.label}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-      <div className="actions">
-        {clip.kind === "image" && isNativeApp() ? (
-          <button className="icon-btn" title="Remove background" onClick={cutOut} disabled={cutting}>
-            {cutting ? "…" : "✂"}
+    <article className={`preview is-${clip.kind}`}>
+      <div className="preview-stage">
+        {clip.kind === "color" ? (
+          <button className="color-face" style={{ background: clip.content }} onClick={() => onCopy(clip.content)}>
+            <span>{clip.meta.colorName ?? "Color"}</span>
+            <b>{clip.content}</b>
           </button>
         ) : null}
-        <button className="icon-btn" aria-pressed={clip.pinned} title="Pin" onClick={() => dispatch({ type: "toggle-pin", id: clip.id })}>
-          {clip.pinned ? "★" : "☆"}
+        {clip.kind === "image" ? <ImagePlay id={clip.meta.imageId} fallback={clip.content} /> : null}
+        {clip.kind === "svg" ? (
+          <img className="shot svg-shot" alt="" src={`data:image/svg+xml;utf8,${encodeURIComponent(clip.content)}`} />
+        ) : null}
+        {clip.kind === "audio" ? (
+          <div className="preview-voice">
+            <Waveform peaks={clip.meta.peaks ?? []} />
+            {clip.meta.audioId ? (
+              <AudioPlay id={clip.meta.audioId} />
+            ) : (
+              <p className="preview-missing">No audio file on this Mac.</p>
+            )}
+            <textarea
+              key={clip.id}
+              className="transcript"
+              defaultValue={clip.meta.transcript ?? (clip.content === "Voice note" ? "" : clip.content)}
+              placeholder="Transcript"
+              onBlur={(e) => dispatch({ type: "set-transcript", id: clip.id, transcript: e.target.value })}
+            />
+          </div>
+        ) : null}
+        {clip.kind === "code" ? <pre className="code-peek">{clip.content.split("\n").slice(0, 14).join("\n")}</pre> : null}
+        {clip.kind === "link" ? (
+          <button className="preview-link" onClick={() => void openLink(linkOf(clip))}>
+            <b>{clip.meta.domain ?? "Link"}</b>
+            <span>{linkOf(clip)}</span>
+          </button>
+        ) : null}
+        {clip.kind === "text" || clip.kind === "path" || clip.kind === "file" || clip.kind === "token" || clip.kind === "timecode" ? (
+          <p className="preview-lead">{body || headline(clip)}</p>
+        ) : null}
+      </div>
+      {body && clip.kind !== "audio" && clip.kind !== "image" && clip.kind !== "text" && clip.kind !== "code" && clip.kind !== "path" && clip.kind !== "file" && clip.kind !== "token" && clip.kind !== "timecode" ? (
+        <p className="preview-body">{body}</p>
+      ) : null}
+      <div className="preview-meta">
+        <span>{clip.source}</span>
+        <span>{formatWhen(clip.createdAt)}</span>
+        {clip.kind === "audio" && clip.meta.durationMs ? <span>{formatTime(clip.meta.durationMs)}</span> : null}
+        {clip.kind === "image" && clip.meta.width ? <span>{clip.meta.width}×{clip.meta.height}</span> : null}
+      </div>
+      <div className="preview-actions">
+        <button className="icon-btn" onClick={() => onCopy(clip.kind === "audio" ? clip.meta.transcript ?? clip.content : clip.kind === "link" ? linkOf(clip) : clip.content)}>
+          Copy
+        </button>
+        {clip.kind === "path" || clip.kind === "file" ? (
+          <button className="icon-btn" onClick={() => void revealPath(clip.content)}>
+            View
+          </button>
+        ) : null}
+        {clip.kind === "link" ? (
+          <button className="icon-btn" onClick={() => void openLink(linkOf(clip))}>
+            Open
+          </button>
+        ) : null}
+        <button className="icon-btn" aria-pressed={clip.pinned} onClick={() => dispatch({ type: "toggle-pin", id: clip.id })}>
+          {clip.pinned ? "Pinned" : "Pin"}
         </button>
         <button
           className="icon-btn"
-          title="Turn into a task"
-          onClick={() => dispatch({ type: "add-task", title: clip.meta.transcript ?? clip.preview, fromClipId: clip.id })}
+          onClick={() => dispatch({ type: "add-task", title: clip.meta.transcript ?? headline(clip), fromClipId: clip.id })}
         >
-          +
+          Task
+        </button>
+        <button className="icon-btn" onClick={() => dispatch({ type: "remove-clip", id: clip.id })}>
+          Remove
         </button>
       </div>
+      {clip.kind === "image" ? (
+        <div className="preview-tools">
+          <button
+            className="icon-btn"
+            disabled={reading}
+            onClick={() => {
+              if (clip.meta.ocr) {
+                setShowText((v) => !v);
+                return;
+              }
+              void readText();
+            }}
+          >
+            {reading ? "Reading…" : "Read text"}
+          </button>
+          {isNativeApp() ? (
+            <button className="icon-btn" onClick={cutOut} disabled={cutting}>
+              {cutting ? "Cutting…" : "Remove background"}
+            </button>
+          ) : null}
+        </div>
+      ) : null}
+      {showText && clip.meta.ocr ? <p className="preview-body">{clip.meta.ocr}</p> : null}
+      {faces.length ? (
+        <div className="faces">
+          {faces.map((f) => (
+            <button key={f.id} className="face" onClick={() => onCopy(f.value)} title={f.value}>
+              {f.label}
+            </button>
+          ))}
+        </div>
+      ) : null}
     </article>
   );
 }
 
+function linkOf(clip: Clip) {
+  const raw = clip.content.trim();
+  if (/^https?:\/\//i.test(raw)) return raw;
+  if (clip.meta.domain) return `https://${clip.meta.domain}`;
+  return raw;
+}
+
+function ClipMark({ clip }: { clip: Clip }) {
+  if (clip.kind === "color") return <i className="clip-mark is-swatch" style={{ background: clip.content }} />;
+  if (clip.kind === "image" && clip.content.startsWith("data:image") && clip.content.length < 24000) {
+    return <i className="clip-mark is-shot" style={{ backgroundImage: `url(${clip.content})` }} />;
+  }
+  return (
+    <i className={`clip-mark is-${clip.kind}`}>
+      <KindIcon kind={clip.kind} />
+    </i>
+  );
+}
+
+function KindIcon({ kind }: { kind: Clip["kind"] }) {
+  if (kind === "link") {
+    return (
+      <svg viewBox="0 0 16 16" aria-hidden="true">
+        <path d="M6.5 9.5l3-3" />
+        <path d="M7.2 5.2l.8-.8a2.4 2.4 0 0 1 3.4 3.4l-.8.8" />
+        <path d="M8.8 10.8l-.8.8a2.4 2.4 0 0 1-3.4-3.4l.8-.8" />
+      </svg>
+    );
+  }
+  if (kind === "image" || kind === "svg") {
+    return (
+      <svg viewBox="0 0 16 16" aria-hidden="true">
+        <rect x="2.2" y="3.2" width="11.6" height="9.6" rx="1.6" />
+        <path d="M2.6 10.2l2.6-2.4 2.2 2 1.6-1.4 3.2 2.8" />
+        <circle cx="6" cy="6.2" r="0.8" fill="currentColor" stroke="none" />
+      </svg>
+    );
+  }
+  if (kind === "audio") {
+    return (
+      <svg viewBox="0 0 16 16" aria-hidden="true">
+        <rect x="6.2" y="2" width="3.6" height="6.4" rx="1.8" />
+        <path d="M4.4 7.2a3.6 3.6 0 0 0 7.2 0M8 10.8V13" />
+      </svg>
+    );
+  }
+  if (kind === "code" || kind === "token") {
+    return (
+      <svg viewBox="0 0 16 16" aria-hidden="true">
+        <path d="M6 4.5L3.2 8 6 11.5M10 4.5L12.8 8 10 11.5" />
+      </svg>
+    );
+  }
+  if (kind === "path" || kind === "file") {
+    return (
+      <svg viewBox="0 0 16 16" aria-hidden="true">
+        <path d="M2.4 4.2h3.2l1.2 1.4h6.8v6.6a1 1 0 0 1-1 1H3.4a1 1 0 0 1-1-1z" />
+      </svg>
+    );
+  }
+  if (kind === "timecode") {
+    return (
+      <svg viewBox="0 0 16 16" aria-hidden="true">
+        <circle cx="8" cy="8" r="5.2" />
+        <path d="M8 5.2V8l2 1.4" />
+      </svg>
+    );
+  }
+  return (
+    <svg viewBox="0 0 16 16" aria-hidden="true">
+      <path d="M3.2 4.2h9.6M3.2 8h9.6M3.2 11.8h6.2" />
+    </svg>
+  );
+}
+
+function previewText(clip: Clip) {
+  if (clip.kind === "audio") return (clip.meta.transcript ?? "").trim();
+  if (clip.kind === "image") return "";
+  if (clip.kind === "link") return linkOf(clip);
+  if (clip.preview.startsWith("data:") || clip.content.startsWith("data:")) return (clip.meta.ocr ?? "").trim();
+  return clip.content.trim();
+}
+
 function headline(clip: Clip) {
+  if (clip.kind === "image" || clip.preview.startsWith("data:") || clip.content.startsWith("data:image")) {
+    return clip.preview && !clip.preview.startsWith("data:") && clip.preview.length < 48 ? clip.preview : "Screenshot";
+  }
   if (clip.kind === "link") return clip.meta.domain ?? clip.preview;
   if (clip.kind === "code") return clip.meta.language ?? "Code";
   if (clip.kind === "audio") return clip.meta.transcript || "Voice note";
@@ -319,27 +444,6 @@ function headline(clip: Clip) {
   if (clip.kind === "path") return clip.meta.pathName ?? clip.preview;
   if (clip.kind === "timecode") return clip.content;
   if (clip.kind === "svg") return "SVG";
-  if (clip.kind === "image") return clip.preview || "Screenshot";
   return clip.preview;
 }
 
-function thumbLabel(clip: Clip) {
-  if (clip.kind === "image") return "";
-  if (clip.kind === "link") return "url";
-  if (clip.kind === "code") return clip.meta.language?.slice(0, 3).toLowerCase() ?? "{ }";
-  if (clip.kind === "file" || clip.kind === "path") return "file";
-  if (clip.kind === "audio") return "mic";
-  if (clip.kind === "svg") return "svg";
-  if (clip.kind === "token") return "var";
-  if (clip.kind === "timecode") return "tc";
-  return "Aa";
-}
-
-function thumbStyle(clip: Clip): CSSProperties {
-  if (clip.kind === "image") return { background: clip.content.startsWith("data:") || clip.content.includes("gradient") ? clip.content : "#1c1824" };
-  if (clip.kind === "token" && clip.content.includes("#")) {
-    const hex = clip.content.match(/#[0-9a-fA-F]{3,8}/)?.[0];
-    if (hex) return { background: hex };
-  }
-  return {};
-}

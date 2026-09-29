@@ -10,10 +10,13 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "desktop": "tauri dev",
-    "dmg": "tauri build"
+    "dmg": "tauri build",
+    "publish-update": "bash scripts/publish-update.sh"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.12.0",
+    "@tauri-apps/plugin-process": "^2.4.0",
+    "@tauri-apps/plugin-updater": "^2.13.0",
     "framer-motion": "^13.4.4",
     "react": "^19.1.1",
     "react-dom": "^19.1.1"

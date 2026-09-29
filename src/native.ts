@@ -17,10 +17,11 @@ export function isNativeApp() {
 export type PermSnapshot = {
   accessibility: boolean;
   calendar: string;
+  microphone: string;
 };
 
 export async function permissionStatus(): Promise<PermSnapshot> {
-  if (!isNativeApp()) return { accessibility: true, calendar: "unavailable" };
+  if (!isNativeApp()) return { accessibility: true, calendar: "unavailable", microphone: "unavailable" };
   const { invoke } = await import("@tauri-apps/api/core");
   return invoke<PermSnapshot>("permission_status");
 }
@@ -31,10 +32,64 @@ export async function requestAccessibility(): Promise<boolean> {
   return invoke<boolean>("request_accessibility");
 }
 
-export async function openPrivacy(kind: "accessibility" | "calendar") {
+export async function requestMicrophone(): Promise<boolean> {
+  if (!isNativeApp()) return true;
+  const { invoke } = await import("@tauri-apps/api/core");
+  return invoke<boolean>("request_microphone");
+}
+
+export async function revealPath(path: string) {
+  let target = path.trim();
+  if (target.startsWith("file://")) {
+    try {
+      target = decodeURIComponent(new URL(target).pathname);
+    } catch {
+      return;
+    }
+  }
+  if (!target.startsWith("/") || !isNativeApp()) return;
+  const { invoke } = await import("@tauri-apps/api/core");
+  await invoke("reveal_path", { path: target });
+}
+
+export async function openLink(url: string) {
+  const href = url.trim();
+  if (!/^https?:\/\//i.test(href)) return;
+  if (!isNativeApp()) {
+    window.open(href, "_blank", "noopener");
+    return;
+  }
+  const { invoke } = await import("@tauri-apps/api/core");
+  await invoke("open_link", { url: href });
+}
+
+export async function openPrivacy(kind: "accessibility" | "calendar" | "microphone") {
   if (!isNativeApp()) return;
   const { invoke } = await import("@tauri-apps/api/core");
   await invoke("open_privacy", { kind });
+}
+
+export async function peekUpdate(): Promise<string | null> {
+  if (!isNativeApp()) return null;
+  const { check } = await import("@tauri-apps/plugin-updater");
+  const update = await check();
+  return update?.version ?? null;
+}
+
+export async function installUpdate(): Promise<void> {
+  if (!isNativeApp()) return;
+  const { check } = await import("@tauri-apps/plugin-updater");
+  const { relaunch } = await import("@tauri-apps/plugin-process");
+  const update = await check();
+  if (!update) return;
+  await update.downloadAndInstall();
+  await relaunch();
+}
+
+export async function appVersion(): Promise<string> {
+  if (!isNativeApp()) return "0.1.0";
+  const { getVersion } = await import("@tauri-apps/api/app");
+  return getVersion();
 }
 
 export async function quitCove() {
@@ -66,15 +121,24 @@ export async function pollAgents(): Promise<AgentStatus[]> {
   }
 }
 
-export async function syncWindow(open: boolean, layout: "horizontal" | "vertical" = "horizontal") {
+let placeChain: Promise<void> = Promise.resolve();
+
+export async function syncWindow(open: boolean, layout: "horizontal" | "vertical" | "settings" = "horizontal") {
   if (!isNativeApp()) return;
-  try {
+  const run = placeChain.then(async () => {
     const { invoke } = await import("@tauri-apps/api/core");
     const geom = await invoke<{ notch_w: number; notch_h: number }>("place_notch", { open, layout });
     if (geom?.notch_w && geom?.notch_h) {
       document.documentElement.style.setProperty("--notch-w", `${geom.notch_w}px`);
       document.documentElement.style.setProperty("--notch-h", `${geom.notch_h}px`);
     }
+  });
+  placeChain = run.then(
+    () => undefined,
+    () => undefined,
+  );
+  try {
+    await run;
   } catch {
     /* web preview */
   }
@@ -108,6 +172,17 @@ export async function ocrImage(blob: Blob): Promise<string | null> {
 }
 
 export type NativeCalEvent = { id: string; title: string; start: string; end: string; calendar: string };
+
+export async function screenTimeToday(): Promise<number | null> {
+  if (!isNativeApp()) return null;
+  try {
+    const { invoke } = await import("@tauri-apps/api/core");
+    const ms = await invoke<number | null>("screen_time_today");
+    return typeof ms === "number" ? ms : null;
+  } catch {
+    return null;
+  }
+}
 
 export async function calendarEvents(): Promise<NativeCalEvent[] | null> {
   if (!isNativeApp()) return null;
@@ -192,14 +267,14 @@ export async function listenSkipPaste(onPaste: (index: number, kind: string) => 
 }
 
 export async function listenNativeClipboard(
-  onText: (text: string, source: string) => void,
+  onText: (text: string, source: string, kind?: "text" | "path") => void,
   onImage: (blob: Blob, source: string, ocr?: string) => void,
 ): Promise<() => void> {
   if (!isNativeApp()) return () => undefined;
   try {
     const { listen } = await import("@tauri-apps/api/event");
     const un = await listen<{
-      kind: "text" | "image";
+      kind: "text" | "image" | "path";
       text?: string;
       rgba?: string;
       width?: number;
@@ -208,7 +283,7 @@ export async function listenNativeClipboard(
       ocr?: string;
     }>("cove-clipboard", (ev) => {
       const p = ev.payload;
-      if (p.kind === "text" && p.text) onText(p.text, p.source ?? "Clipboard");
+      if ((p.kind === "text" || p.kind === "path") && p.text) onText(p.text, p.source ?? "Clipboard", p.kind);
       if (p.kind === "image" && p.rgba && p.width && p.height) {
         const bin = atob(p.rgba);
         const bytes = new Uint8ClampedArray(bin.length);

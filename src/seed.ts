@@ -1,30 +1,84 @@
-import type { AppState } from "./types";
+import type { AppState, Clip } from "./types";
 import { uid } from "./lib";
 
 const now = Date.now();
 
+const ALT_MARK = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 305 305"><g fill="#3919A2"><path d="M58.3 0H43.4v43.4H0v14.8h43.4v43.4h14.9V58.2h43.4V43.4H58.3V0z"/><path d="M159.9 0h-14.8v101.7h14.8V0z"/><path d="M101.7 145.1H0v14.8h101.7v-14.8z"/><path d="M305 145.1h-101.7v14.8H305v-14.8z"/><path d="M261.6 43.4V0h-14.8v43.4h-43.4v14.8h43.4v43.4h14.8V58.2H305V43.4h-43.4z"/><path d="M58.3 203.3H43.4v43.4H0v14.9h43.4V305h14.9v-43.4h43.4v-14.9H58.3v-43.4z"/><path d="M159.9 203.3h-14.8V305h14.8V203.3z"/><path d="M261.6 203.3h-14.8v43.4h-43.4v14.9h43.4V305h14.8v-43.4H305v-14.9h-43.4v-43.4z"/></g></svg>`;
+
+function orgClip(partial: Omit<Clip, "id" | "createdAt" | "pinned" | "board" | "source"> & { id: string }): Clip {
+  return {
+    createdAt: now,
+    pinned: true,
+    board: "Design",
+    source: "Alt Carbon",
+    ...partial,
+  };
+}
+
+export function orgPins(): Clip[] {
+  const links: [string, string, string, string][] = [
+    ["org_home", "https://altcarbon.com", "altcarbon.com", "Alt Carbon"],
+    ["org_eli5", "https://altcarbon.com/eli5", "altcarbon.com/eli5", "ELI5"],
+    ["org_alter", "https://altermag.com", "altermag.com", "Alter"],
+    ["org_notion", "https://altcarbon.notion.site/intro", "altcarbon.notion.site", "Intro"],
+  ];
+  const colors: [string, string, string][] = [
+    ["org_iris", "#704BD7", "Monsoon Iris"],
+    ["org_deep", "#3919A2", "Iris Deep"],
+    ["org_forest", "#0E4325", "Forest"],
+    ["org_indigo", "#171C60", "Indigo"],
+    ["org_field", "#A6D147", "Field"],
+    ["org_rain", "#B7E9F9", "Rain"],
+  ];
+  return [
+    ...links.map(([id, content, domain, preview]) =>
+      orgClip({ id, kind: "link", content, preview, meta: { domain: preview || domain } }),
+    ),
+    orgClip({ id: "org_mark", kind: "svg", content: ALT_MARK, preview: "Alt mark", meta: { language: "SVG" } }),
+    ...colors.map(([id, content, colorName]) =>
+      orgClip({ id, kind: "color", content, preview: content, meta: { colorName } }),
+    ),
+  ];
+}
+
+export const FOCUS_COPY = "Do not be a Chinmay, win your focus time";
+
+export const NOTEPAD_COPY = [
+  "- Don't context switch like Sparsh, close 1 thing today",
+  "- Speak to Shrey on 3-month reviews",
+  "- Ask Dr. Sourav if laser ablations can save the world",
+].join("\n");
+
+export function isDemoNote(text: string) {
+  return text.startsWith("Ship Perch as one notch") || text.startsWith("Ship the notch as one notch");
+}
+
+export const TODAY_TASKS = [
+  "Find Minerals — AK promised diamonds",
+  "Don't be a Siddhi, free Wed plans",
+];
+
 export const seed: AppState = {
   boards: ["Design", "Edit", "Code", "Life"],
+  folders: [],
+  notes: [],
+  moodBoards: [],
+  books: [],
+  vault: [],
   blockedSecrets: 0,
   lastBlockedAt: null,
   layout: "horizontal",
-  skin: "dark",
+  skin: "mat",
   hoverOpen: true,
   showRings: true,
   showTimer: true,
   notesByDay: {
-    [new Date().toISOString().slice(0, 10)]:
-      "Ship Cove as one notch, not two apps.\nKeep clipboard types visible without folders.\nTurn copied error text into a task when it matters.\nAsk Arpit/Aditya-shaped question: what belongs in the island when idle?",
+    [new Date().toISOString().slice(0, 10)]: NOTEPAD_COPY,
   },
-  events: [
-    { id: "e1", title: "Design critique", start: "14:30", end: "15:00", calendar: "Work" },
-    { id: "e2", title: "Walk + errands", start: "17:45", end: "18:30", calendar: "Personal" },
-    { id: "e3", title: "Write release note", start: "20:00", end: "20:40", calendar: "Work" },
-  ],
+  events: [],
   tasks: [
-    { id: "t1", title: "Polish the notch expand so it feels like the island, not a window", done: false, createdAt: now - 3600_000 },
-    { id: "t2", title: "Auto-sort colors, links, and code without asking", done: false, createdAt: now - 7200_000 },
-    { id: "t3", title: "Block secrets before they ever hit history", done: true, createdAt: now - 10800_000, doneAt: now - 9000_000 },
+    { id: "minerals", title: TODAY_TASKS[0], done: false, createdAt: now - 3600_000, when: "today" },
+    { id: "wed", title: TODAY_TASKS[1], done: false, createdAt: now - 7200_000, when: "today" },
   ],
   focusLog: [
     { id: "f1", mode: "pomodoro", startedAt: now - 86400000 * 1 - 3600_000, durationMs: 25 * 60 * 1000, taskId: "t3" },
@@ -36,17 +90,25 @@ export const seed: AppState = {
     mode: "pomodoro",
     remainingMs: 25 * 60 * 1000,
     durationMs: 25 * 60 * 1000,
-    taskId: "t1",
+    taskId: null,
     startedAt: null,
   },
+  water: {
+    goal: 8,
+    count: 0,
+    day: new Date().toISOString().slice(0, 10),
+    intervalMin: 60,
+    lastAt: null,
+  },
   clips: [
+    ...orgPins(),
     {
       id: uid("clip"),
       kind: "color",
       content: "#6C6CF8",
       preview: "#6C6CF8",
       createdAt: now - 40_000,
-      pinned: true,
+      pinned: false,
       board: "Design",
       source: "Figma",
       meta: { colorName: "Iris" },
@@ -76,15 +138,15 @@ export const seed: AppState = {
     {
       id: uid("clip"),
       kind: "audio",
-      content: "Ship Cove as one notch, not two apps.",
-      preview: "Ship Cove as one notch, not two apps.",
+      content: "Ship the notch as one notch, not two apps.",
+      preview: "Ship the notch as one notch, not two apps.",
       createdAt: now - 20_000,
       pinned: false,
       board: "Edit",
       source: "Roux",
       meta: {
         durationMs: 7400,
-        transcript: "Ship Cove as one notch, not two apps.",
+        transcript: "Ship the notch as one notch, not two apps.",
         peaks: [0.12, 0.4, 0.7, 0.55, 0.3, 0.62, 0.8, 0.45, 0.2, 0.5, 0.66, 0.3, 0.18, 0.42, 0.7, 0.38],
       },
     },
@@ -124,8 +186,8 @@ export const seed: AppState = {
     {
       id: uid("clip"),
       kind: "link",
-      content: "https://www.figma.com/design/cove/island",
-      preview: "figma.com/design/cove/island",
+      content: "https://www.figma.com/design/perch/island",
+      preview: "figma.com/design/perch/island",
       createdAt: now - 120_000,
       pinned: false,
       board: "Design",
@@ -153,7 +215,7 @@ export const seed: AppState = {
       board: "Life",
       source: "Screenshot",
       meta: {
-        ocr: "Cove  24:12  Brand review\nKeep this in the island while you work.",
+        ocr: "Climate Studio  24:12  Brand review\nKeep this in the island while you work.",
         width: 1440,
         height: 900,
       },

@@ -12,7 +12,7 @@ export function BackupButtons() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `cove-backup-${new Date().toISOString().slice(0, 10)}.json`;
+    a.download = `perch-backup-${new Date().toISOString().slice(0, 10)}.json`;
     a.click();
     URL.revokeObjectURL(url);
   };

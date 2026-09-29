@@ -3,7 +3,9 @@ export type ActivityKind =
   | "clip-landed"
   | "recording"
   | "secret-blocked"
-  | "agent-alert";
+  | "agent-alert"
+  | "task-remind"
+  | "water-sip";
 
 export interface IslandActivity {
   id: string;
@@ -33,6 +35,8 @@ export interface IslandInputs {
   latestClip: { id: string; kind: string; preview: string; createdAt: number; accent?: string } | null;
   lastBlockedAt: number | null;
   agentAlert: { id: string; label: string; percent: number } | null;
+  reminder?: { id: string; title: string; at: number } | null;
+  water?: { due: boolean; count: number; goal: number } | null;
 }
 
 export const PRIORITY: Record<ActivityKind, number> = {
@@ -40,6 +44,8 @@ export const PRIORITY: Record<ActivityKind, number> = {
   recording: 40,
   "focus-timer": 30,
   "agent-alert": 20,
+  "task-remind": 35,
+  "water-sip": 32,
   "clip-landed": 10,
 };
 
@@ -86,6 +92,29 @@ export function buildActivities(input: IslandInputs, now: number): IslandActivit
       label: "held",
       detail: "Secret not saved",
       expiresAt: input.lastBlockedAt + SECRET_TTL,
+    });
+  }
+
+  if (input.reminder && input.reminder.at <= now && now < input.reminder.at + 8 * 60 * 1000) {
+    acts.push({
+      id: `remind-${input.reminder.id}`,
+      kind: "task-remind",
+      priority: PRIORITY["task-remind"],
+      persistent: false,
+      label: "Remind",
+      detail: input.reminder.title,
+      expiresAt: input.reminder.at + 8 * 60 * 1000,
+    });
+  }
+
+  if (input.water?.due) {
+    acts.push({
+      id: "water-sip",
+      kind: "water-sip",
+      priority: PRIORITY["water-sip"],
+      persistent: false,
+      label: "Sip",
+      detail: `${input.water.count}/${input.water.goal}`,
     });
   }
 

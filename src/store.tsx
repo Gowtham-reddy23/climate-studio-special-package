@@ -7,9 +7,9 @@ import {
   type Dispatch,
   type ReactNode,
 } from "react";
-import { seed } from "./seed";
-import type { Action, AppState, Clip, FocusState } from "./types";
-import { uid } from "./lib";
+import { isDemoNote, NOTEPAD_COPY, orgPins, seed, TODAY_TASKS } from "./seed";
+import type { Action, AppState, Book, Clip, FocusState, MoodBoard, Note, Task, VaultItem } from "./types";
+import { todayKey, uid } from "./lib";
 import { persist } from "./storage";
 
 const KEY = "cove.v3";
@@ -20,7 +20,7 @@ const DURATIONS: Record<FocusState["mode"], number> = {
   watch: 0,
 };
 
-function reduce(state: AppState, action: Action): AppState {
+export function reduce(state: AppState, action: Action): AppState {
   switch (action.type) {
     case "hydrate":
       return action.state;
@@ -51,6 +51,28 @@ function reduce(state: AppState, action: Action): AppState {
     case "add-board":
       if (!action.name.trim() || state.boards.includes(action.name.trim())) return state;
       return { ...state, boards: [...state.boards, action.name.trim()] };
+    case "add-folder": {
+      const name = action.name.trim().slice(0, 28);
+      const board = action.board.trim();
+      if (!name || !board) return state;
+      if (state.folders.some((f) => f.board === board && f.name.toLowerCase() === name.toLowerCase())) return state;
+      return { ...state, folders: [...state.folders, { id: uid("folder"), name, board }] };
+    }
+    case "remove-folder":
+      return {
+        ...state,
+        folders: state.folders.filter((f) => f.id !== action.id),
+        clips: state.clips.map((c) => (c.folder === action.id ? { ...c, folder: null } : c)),
+      };
+    case "set-folder": {
+      const folder = state.folders.find((f) => f.id === action.folder);
+      return {
+        ...state,
+        clips: state.clips.map((c) =>
+          c.id === action.id ? { ...c, folder: action.folder, board: folder?.board ?? c.board } : c,
+        ),
+      };
+    }
     case "add-task": {
       const title = action.title.trim();
       if (!title) return state;
@@ -60,6 +82,9 @@ function reduce(state: AppState, action: Action): AppState {
         done: false,
         createdAt: Date.now(),
         fromClipId: action.fromClipId,
+        when: action.when ?? "today",
+        detail: "",
+        remindAt: action.remindAt ?? null,
       };
       return { ...state, tasks: [task, ...state.tasks] };
     }
@@ -72,8 +97,42 @@ function reduce(state: AppState, action: Action): AppState {
             : t,
         ),
       };
+    case "set-task":
+      return {
+        ...state,
+        tasks: state.tasks.map((t) =>
+          t.id === action.id
+            ? {
+                ...t,
+                title: action.title !== undefined ? action.title.trim() || t.title : t.title,
+                when: action.when ?? t.when,
+                detail: action.detail !== undefined ? action.detail : t.detail,
+                ...("remindAt" in action ? { remindAt: action.remindAt } : {}),
+                ...("limitMin" in action ? { limitMin: action.limitMin } : {}),
+                ...("snoozeUntil" in action ? { snoozeUntil: action.snoozeUntil } : {}),
+              }
+            : t,
+        ),
+      };
+    case "duplicate-task": {
+      const src = state.tasks.find((t) => t.id === action.id);
+      if (!src) return state;
+      const copy = {
+        ...src,
+        id: uid("task"),
+        title: src.title,
+        done: false,
+        doneAt: null,
+        createdAt: Date.now(),
+        remindAt: null,
+        snoozeUntil: null,
+      };
+      return { ...state, tasks: [copy, ...state.tasks] };
+    }
     case "remove-task":
       return { ...state, tasks: state.tasks.filter((t) => t.id !== action.id) };
+    case "clear-done":
+      return { ...state, tasks: state.tasks.filter((t) => !t.done) };
     case "set-note":
       return { ...state, notesByDay: { ...state.notesByDay, [action.day]: action.text } };
     case "append-note": {
@@ -81,6 +140,52 @@ function reduce(state: AppState, action: Action): AppState {
       const next = prev ? `${prev}\n${action.text}` : action.text;
       return { ...state, notesByDay: { ...state.notesByDay, [action.day]: next } };
     }
+    case "add-note": {
+      const title = action.title.trim() || (action.kind === "list" ? "List" : "Note");
+      const note: Note = {
+        id: uid("note"),
+        title,
+        body: action.body ?? (action.kind === "list" ? "- [ ] " : ""),
+        kind: action.kind,
+        via: action.via,
+        audioId: action.audioId,
+        durationMs: action.durationMs,
+        peaks: action.peaks,
+        pinned: false,
+        updatedAt: Date.now(),
+      };
+      return { ...state, notes: [note, ...(state.notes ?? [])] };
+    }
+    case "update-note":
+      return {
+        ...state,
+        notes: (state.notes ?? []).map((n) =>
+          n.id === action.id
+            ? {
+                ...n,
+                title: action.title !== undefined ? action.title : n.title,
+                body: action.body !== undefined ? action.body : n.body,
+                pinned: action.pinned !== undefined ? action.pinned : n.pinned,
+                updatedAt: Date.now(),
+              }
+            : n,
+        ),
+      };
+    case "remove-note":
+      return { ...state, notes: (state.notes ?? []).filter((n) => n.id !== action.id) };
+    case "toggle-note-line":
+      return {
+        ...state,
+        notes: (state.notes ?? []).map((n) => {
+          if (n.id !== action.id) return n;
+          const lines = n.body.split("\n");
+          const line = lines[action.index] ?? "";
+          if (line.startsWith("- [x]")) lines[action.index] = line.replace("- [x]", "- [ ]");
+          else if (line.startsWith("- [ ]")) lines[action.index] = line.replace("- [ ]", "- [x]");
+          else lines[action.index] = `- [ ] ${line}`;
+          return { ...n, body: lines.join("\n"), updatedAt: Date.now() };
+        }),
+      };
     case "set-ocr":
       return {
         ...state,
@@ -98,7 +203,7 @@ function reduce(state: AppState, action: Action): AppState {
         ),
       };
     case "focus-start": {
-      const duration = DURATIONS[action.mode];
+      const duration = action.durationMs && action.durationMs > 0 ? action.durationMs : DURATIONS[action.mode];
       return {
         ...state,
         focus: {
@@ -115,15 +220,31 @@ function reduce(state: AppState, action: Action): AppState {
       return { ...state, focus: { ...state.focus, running: false } };
     case "focus-resume":
       return { ...state, focus: { ...state.focus, running: true, startedAt: Date.now() } };
-    case "focus-add":
+    case "focus-set": {
+      const duration = Math.max(5 * 60 * 1000, Math.min(180 * 60 * 1000, action.durationMs));
       return {
         ...state,
         focus: {
           ...state.focus,
-          remainingMs: state.focus.remainingMs + action.minutes * 60 * 1000,
-          durationMs: state.focus.durationMs + action.minutes * 60 * 1000,
+          mode: state.focus.mode === "watch" ? "pomodoro" : state.focus.mode,
+          remainingMs: duration,
+          durationMs: duration,
+          running: state.focus.running,
+          startedAt: state.focus.running ? state.focus.startedAt : null,
         },
       };
+    }
+    case "focus-add": {
+      const remaining = Math.max(60 * 1000, state.focus.remainingMs + action.minutes * 60 * 1000);
+      return {
+        ...state,
+        focus: {
+          ...state.focus,
+          remainingMs: remaining,
+          durationMs: Math.max(remaining, state.focus.durationMs + action.minutes * 60 * 1000),
+        },
+      };
+    }
     case "focus-tick":
       return { ...state, focus: { ...state.focus, remainingMs: action.remainingMs } };
     case "focus-delta": {
@@ -132,6 +253,25 @@ function reduce(state: AppState, action: Action): AppState {
           ? state.focus.remainingMs + action.ms
           : Math.max(0, state.focus.remainingMs - action.ms);
       return { ...state, focus: { ...state.focus, remainingMs: next } };
+    }
+    case "water-drink": {
+      const day = todayKey();
+      const water = state.water ?? seed.water;
+      const count = water.day === day ? water.count : 0;
+      if (count >= water.goal) {
+        return { ...state, water: { ...water, day, lastAt: Date.now() } };
+      }
+      return { ...state, water: { ...water, day, count: count + 1, lastAt: Date.now() } };
+    }
+    case "water-set": {
+      const day = todayKey();
+      const water = state.water ?? seed.water;
+      const prev = water.day === day ? water.count : 0;
+      const count = Math.max(0, Math.min(water.goal, action.count));
+      return {
+        ...state,
+        water: { ...water, day, count, lastAt: count > prev ? Date.now() : water.lastAt },
+      };
     }
     case "focus-stop": {
       const elapsed =
@@ -162,6 +302,61 @@ function reduce(state: AppState, action: Action): AppState {
         },
       };
     }
+    case "add-mood": {
+      const title = action.title.trim();
+      if (!title) return state;
+      const board: MoodBoard = { id: uid("mood"), title, shots: [], updatedAt: Date.now() };
+      return { ...state, moodBoards: [board, ...(state.moodBoards ?? [])] };
+    }
+    case "remove-mood":
+      return { ...state, moodBoards: (state.moodBoards ?? []).filter((b) => b.id !== action.id) };
+    case "add-shot":
+      return {
+        ...state,
+        moodBoards: (state.moodBoards ?? []).map((b) =>
+          b.id === action.id && !b.shots.includes(action.clipId)
+            ? { ...b, shots: [...b.shots, action.clipId], updatedAt: Date.now() }
+            : b,
+        ),
+      };
+    case "remove-shot":
+      return {
+        ...state,
+        moodBoards: (state.moodBoards ?? []).map((b) =>
+          b.id === action.id ? { ...b, shots: b.shots.filter((id) => id !== action.clipId), updatedAt: Date.now() } : b,
+        ),
+      };
+    case "add-book": {
+      const title = action.title.trim();
+      if (!title) return state;
+      const book: Book = { id: uid("book"), title, author: action.author.trim(), status: "want" };
+      return { ...state, books: [book, ...(state.books ?? [])] };
+    }
+    case "set-book":
+      return {
+        ...state,
+        books: (state.books ?? []).map((b) =>
+          b.id === action.id
+            ? {
+                ...b,
+                status: action.status ?? b.status,
+                title: action.title !== undefined ? action.title : b.title,
+                author: action.author !== undefined ? action.author : b.author,
+              }
+            : b,
+        ),
+      };
+    case "remove-book":
+      return { ...state, books: (state.books ?? []).filter((b) => b.id !== action.id) };
+    case "add-vault": {
+      const label = action.label.trim();
+      const value = action.value.trim();
+      if (!label || !value) return state;
+      const item: VaultItem = { id: uid("vault"), label, value, updatedAt: Date.now() };
+      return { ...state, vault: [item, ...(state.vault ?? [])] };
+    }
+    case "remove-vault":
+      return { ...state, vault: (state.vault ?? []).filter((v) => v.id !== action.id) };
     case "secret-blocked":
       return { ...state, blockedSecrets: state.blockedSecrets + 1, lastBlockedAt: Date.now() };
     case "set-layout":
@@ -179,6 +374,38 @@ function reduce(state: AppState, action: Action): AppState {
 
 const StoreContext = createContext<{ state: AppState; dispatch: Dispatch<Action> } | null>(null);
 
+function mergeOrgPins(clips: AppState["clips"]) {
+  const have = new Set(clips.flatMap((c) => [c.id, c.content]));
+  const missing = orgPins().filter((p) => !have.has(p.id) && !have.has(p.content));
+  return missing.length ? [...missing, ...clips] : clips;
+}
+
+const DEMO_TITLES = new Set([
+  "Polish the notch expand so it feels like the island, not a window",
+  "Auto-sort colors, links, and code without asking",
+  "Block secrets before they ever hit history",
+]);
+
+function isDemoTask(task: { title: string }) {
+  return DEMO_TITLES.has(task.title);
+}
+
+function migrateTasks(tasks: Task[]) {
+  if (!tasks.some(isDemoTask)) return tasks;
+  const kept = tasks.filter((task) => !isDemoTask(task) && !TODAY_TASKS.includes(task.title));
+  return [...seed.tasks, ...kept];
+}
+
+function migrateNotes(notesByDay: AppState["notesByDay"] | undefined) {
+  const day = new Date().toISOString().slice(0, 10);
+  const notes = { ...(notesByDay ?? {}) };
+  if (!(day in notes) || isDemoNote(notes[day] ?? "")) notes[day] = NOTEPAD_COPY;
+  for (const key of Object.keys(notes)) {
+    if (isDemoNote(notes[key] ?? "")) notes[key] = NOTEPAD_COPY;
+  }
+  return notes;
+}
+
 function loadInitial(): AppState {
   try {
     const raw = localStorage.getItem(KEY);
@@ -189,14 +416,23 @@ function loadInitial(): AppState {
       ...seed,
       ...parsed,
       boards: ["Design", "Edit", "Code", "Life"],
-      layout: parsed.layout === "vertical" ? "vertical" : "horizontal",
-      skin: (["glass", "dark", "light", "mat"] as const).includes(parsed.skin as never)
-        ? (parsed.skin as AppState["skin"])
-        : "dark",
+      folders: Array.isArray(parsed.folders) ? parsed.folders : [],
+      notes: Array.isArray(parsed.notes) ? parsed.notes : [],
+      moodBoards: Array.isArray(parsed.moodBoards) ? parsed.moodBoards : [],
+      books: Array.isArray(parsed.books) ? parsed.books : [],
+      vault: Array.isArray(parsed.vault) ? parsed.vault : [],
+      layout: "horizontal",
+      skin: "mat",
       hoverOpen: parsed.hoverOpen !== false,
       showRings: parsed.showRings !== false,
       showTimer: parsed.showTimer !== false,
+      notesByDay: migrateNotes(parsed.notesByDay),
+      tasks: migrateTasks(Array.isArray(parsed.tasks) ? parsed.tasks : seed.tasks),
+      focus: parsed.focus ? { ...seed.focus, ...parsed.focus, taskId: null } : seed.focus,
       focusLog: Array.isArray(parsed.focusLog) ? parsed.focusLog : seed.focusLog,
+      water: { ...seed.water, ...(parsed.water ?? {}) },
+      events: Array.isArray(parsed.events) ? parsed.events.filter((e) => !["e1", "e2", "e3"].includes(e.id)) : [],
+      clips: mergeOrgPins(parsed.clips),
     };
   } catch {
     return seed;

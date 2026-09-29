@@ -30,9 +30,44 @@ function speechCtor(): (new () => Recog) | null {
 }
 
 function pickMime() {
-  const types = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4", "audio/ogg"];
+  const webkit = /Apple|Safari/.test(navigator.vendor + navigator.userAgent);
+  const types = webkit
+    ? ["audio/mp4", "audio/webm;codecs=opus", "audio/webm"]
+    : ["audio/webm;codecs=opus", "audio/webm", "audio/mp4"];
   if (typeof MediaRecorder === "undefined") return "";
   return types.find((t) => MediaRecorder.isTypeSupported(t)) ?? "";
+}
+
+function encodeWav(chunks: Float32Array[], sampleRate: number): Blob | null {
+  const samples = chunks.reduce((n, chunk) => n + chunk.length, 0);
+  if (samples < sampleRate / 5) return null;
+  const buffer = new ArrayBuffer(44 + samples * 2);
+  const view = new DataView(buffer);
+  const write = (offset: number, text: string) => {
+    for (let i = 0; i < text.length; i += 1) view.setUint8(offset + i, text.charCodeAt(i));
+  };
+  write(0, "RIFF");
+  view.setUint32(4, 36 + samples * 2, true);
+  write(8, "WAVE");
+  write(12, "fmt ");
+  view.setUint32(16, 16, true);
+  view.setUint16(20, 1, true);
+  view.setUint16(22, 1, true);
+  view.setUint32(24, sampleRate, true);
+  view.setUint32(28, sampleRate * 2, true);
+  view.setUint16(32, 2, true);
+  view.setUint16(34, 16, true);
+  write(36, "data");
+  view.setUint32(40, samples * 2, true);
+  let offset = 44;
+  for (const chunk of chunks) {
+    for (let i = 0; i < chunk.length; i += 1) {
+      const sample = Math.max(-1, Math.min(1, chunk[i] ?? 0));
+      view.setInt16(offset, sample < 0 ? sample * 0x8000 : sample * 0x7fff, true);
+      offset += 2;
+    }
+  }
+  return new Blob([buffer], { type: "audio/wav" });
 }
 
 export function useRecorder() {
@@ -55,6 +90,9 @@ export function useRecorder() {
   const mediaRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const mimeRef = useRef("");
+  const pcmRef = useRef<Float32Array[]>([]);
+  const rateRef = useRef(16000);
+  const procRef = useRef<ScriptProcessorNode | null>(null);
 
   useEffect(() => {
     setSpeechAvailable(Boolean(speechCtor()));
@@ -121,28 +159,36 @@ export function useRecorder() {
     stopSpeech();
     cancelAnimationFrame(rafRef.current);
 
-    const blob = await new Promise<Blob | null>((resolve) => {
-      let done = false;
-      const finish = (next: Blob | null) => {
-        if (done) return;
-        done = true;
-        resolve(next);
-      };
+    const recorded = await new Promise<Blob | null>((resolve) => {
       const rec = mediaRef.current;
-      const fromChunks = (type: string) =>
-        chunksRef.current.length ? new Blob(chunksRef.current, { type: type || "audio/webm" }) : null;
+      const pack = () => {
+        const type = rec?.mimeType || mimeRef.current || "audio/mp4";
+        const blob = chunksRef.current.length ? new Blob(chunksRef.current, { type }) : null;
+        return blob && blob.size > 1000 ? blob : null;
+      };
       if (!rec || rec.state === "inactive") {
-        finish(fromChunks(mimeRef.current));
+        resolve(pack());
         return;
       }
-      rec.onstop = () => finish(fromChunks(rec.mimeType || mimeRef.current));
+      let settled = false;
+      const finish = () => {
+        if (settled) return;
+        settled = true;
+        window.setTimeout(() => resolve(pack()), 80);
+      };
+      rec.onstop = finish;
       try {
+        if (rec.state === "recording") rec.requestData();
         rec.stop();
       } catch {
-        finish(fromChunks(mimeRef.current));
+        finish();
       }
-      window.setTimeout(() => finish(fromChunks(rec.mimeType || mimeRef.current)), 1200);
+      window.setTimeout(finish, 1200);
     });
+    const spoken = encodeWav(pcmRef.current, rateRef.current);
+    const blob = spoken ?? recorded;
+    procRef.current?.disconnect();
+    procRef.current = null;
 
     streamRef.current?.getTracks().forEach((t) => t.stop());
     if (ctxRef.current) void ctxRef.current.close();
@@ -155,6 +201,7 @@ export function useRecorder() {
     ctxRef.current = null;
     mediaRef.current = null;
     chunksRef.current = [];
+    pcmRef.current = [];
     setRecording(false);
     setLevel(0);
     setElapsedMs(durationMs);
@@ -173,10 +220,13 @@ export function useRecorder() {
     finalsRef.current = "";
     peaksRef.current = [];
     chunksRef.current = [];
+    pcmRef.current = [];
     setPartial("");
     setPeaks([]);
     setElapsedMs(0);
     try {
+      const { requestMicrophone } = await import("../native");
+      await requestMicrophone();
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
       });
@@ -188,6 +238,23 @@ export function useRecorder() {
       const analyser = ctx.createAnalyser();
       analyser.fftSize = 128;
       source.connect(analyser);
+      const step = Math.max(1, Math.round(ctx.sampleRate / 16000));
+      rateRef.current = Math.round(ctx.sampleRate / step);
+      const processor = ctx.createScriptProcessor(4096, 1, 1);
+      const mute = ctx.createGain();
+      mute.gain.value = 0;
+      source.connect(processor);
+      processor.connect(mute);
+      mute.connect(ctx.destination);
+      processor.onaudioprocess = (event) => {
+        if (!recordingRef.current) return;
+        const input = event.inputBuffer.getChannelData(0);
+        const count = Math.floor(input.length / step);
+        const down = new Float32Array(count);
+        for (let i = 0; i < count; i += 1) down[i] = input[i * step] ?? 0;
+        pcmRef.current.push(down);
+      };
+      procRef.current = processor;
       const data = new Uint8Array(analyser.frequencyBinCount);
       startedRef.current = Date.now();
       recordingRef.current = true;
@@ -199,7 +266,7 @@ export function useRecorder() {
         rec.ondataavailable = (e) => {
           if (e.data.size) chunksRef.current.push(e.data);
         };
-        rec.start(250);
+        rec.start();
         mediaRef.current = rec;
       }
 
