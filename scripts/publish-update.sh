@@ -3,7 +3,7 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 KEY="$HOME/.tauri/perch.key"
-REPO="Gowtham-reddy23/perch-updates"
+REPO="Gowtham-reddy23/climate-studio-special-package"
 
 if [[ ! -f "$KEY" ]]; then
   echo "Missing signing key at $KEY"
