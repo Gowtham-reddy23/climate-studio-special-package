@@ -2255,6 +2255,16 @@ button:active:not(:disabled) {
   flex: 1;
   min-width: 0;
 }
+.workspace .ws-card.is-tasks .task-edit {
+  flex: 1;
+  min-width: 0;
+  color: #241f18;
+  background: rgba(255, 255, 255, 0.72);
+  border-radius: 8px;
+  padding: 4px 8px;
+  font: inherit;
+  font-weight: 600;
+}
 .workspace .ws-card.is-tasks li > .task-more {
   flex: none;
   margin-left: 0;

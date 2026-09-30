@@ -7,7 +7,7 @@ import {
   type Dispatch,
   type ReactNode,
 } from "react";
-import { isDemoNote, NOTEPAD_COPY, orgPins, seed, TODAY_TASKS } from "./seed";
+import { isDemoNote, NOTEPAD_COPY, orgPins, PREVIOUS_NOTEPAD_COPY, seed, TODAY_TASKS, withoutDroppedNotes } from "./seed";
 import type { Action, AppState, Book, Clip, FocusState, MoodBoard, Note, Task, VaultItem } from "./types";
 import { todayKey, uid } from "./lib";
 import { persist } from "./storage";
@@ -393,15 +393,21 @@ function isDemoTask(task: { title: string }) {
 }
 
 function migrateTasks(tasks: Task[]) {
-  if (!tasks.some(isDemoTask)) return tasks;
-  const kept = tasks.filter((task) => !isDemoTask(task) && !TODAY_TASKS.includes(task.title));
-  return [...seed.tasks, ...kept];
+  const base = tasks.some(isDemoTask)
+    ? [...seed.tasks, ...tasks.filter((task) => !isDemoTask(task) && !TODAY_TASKS.includes(task.title))]
+    : tasks;
+  const missing = seed.tasks.filter(
+    (task) => task.id === "mahananda" && !base.some((item) => item.id === task.id || item.title === task.title),
+  );
+  return missing.length ? [...missing, ...base] : base;
 }
 
 function migrateNotes(notesByDay: AppState["notesByDay"] | undefined) {
   const day = new Date().toISOString().slice(0, 10);
   const notes = { ...(notesByDay ?? {}) };
-  if (!(day in notes) || isDemoNote(notes[day] ?? "")) notes[day] = NOTEPAD_COPY;
+  const current = notes[day] ?? "";
+  if (!(day in notes) || isDemoNote(current) || current.trim() === PREVIOUS_NOTEPAD_COPY) notes[day] = NOTEPAD_COPY;
+  else if (day in notes) notes[day] = withoutDroppedNotes(current) || NOTEPAD_COPY;
   for (const key of Object.keys(notes)) {
     if (isDemoNote(notes[key] ?? "")) notes[key] = NOTEPAD_COPY;
   }

@@ -42,17 +42,37 @@ export function orgPins(): Clip[] {
 
 export const FOCUS_COPY = "Do not be a Chinmay, win your focus time";
 
-export const NOTEPAD_COPY = [
+export const PREVIOUS_NOTEPAD_COPY = [
   "- Don't context switch like Sparsh, close 1 thing today",
   "- Speak to Shrey on 3-month reviews",
   "- Ask Dr. Sourav if laser ablations can save the world",
 ].join("\n");
+
+const DROPPED_NOTE_LINES = new Set([
+  "- Speak to Shrey on 3-month reviews",
+  "- Ask Dr. Sourav if laser ablations can save the world",
+]);
+
+export const NOTEPAD_COPY = [
+  "- Don't context switch like Sparsh, close 1 thing today",
+  "- Casually talk to Shrey and steal his ideas",
+  "- Remind Dr. Sourav that sandesh still tastes like chalk",
+].join("\n");
+
+export function withoutDroppedNotes(text: string) {
+  return text
+    .split("\n")
+    .filter((line) => !DROPPED_NOTE_LINES.has(line.trim()))
+    .join("\n")
+    .trim();
+}
 
 export function isDemoNote(text: string) {
   return text.startsWith("Ship Perch as one notch") || text.startsWith("Ship the notch as one notch");
 }
 
 export const TODAY_TASKS = [
+  "Talk to Mahananda on minerals!",
   "Find Minerals — AK promised diamonds",
   "Don't be a Siddhi, free Wed plans",
 ];
@@ -77,8 +97,9 @@ export const seed: AppState = {
   events: [],
   google: { connected: false, configured: false, email: "", error: "" },
   tasks: [
-    { id: "minerals", title: TODAY_TASKS[0], done: false, createdAt: now - 3600_000, when: "today" },
-    { id: "wed", title: TODAY_TASKS[1], done: false, createdAt: now - 7200_000, when: "today" },
+    { id: "mahananda", title: TODAY_TASKS[0], done: false, createdAt: now - 1800_000, when: "today" },
+    { id: "minerals", title: TODAY_TASKS[1], done: false, createdAt: now - 3600_000, when: "today" },
+    { id: "wed", title: TODAY_TASKS[2], done: false, createdAt: now - 7200_000, when: "today" },
   ],
   focusLog: [
     { id: "f1", mode: "pomodoro", startedAt: now - 86400000 * 1 - 3600_000, durationMs: 25 * 60 * 1000, taskId: "t3" },

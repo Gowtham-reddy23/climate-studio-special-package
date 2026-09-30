@@ -160,21 +160,7 @@ export function TodayView({
         </div>
         <ul>
           {[...openTasks, ...doneTasks].slice(0, 6).map((t) => (
-            <li key={t.id} className={t.done ? "is-done" : ""}>
-              <div className="task-main">
-                <button
-                  className="check"
-                  aria-checked={t.done}
-                  aria-label={t.done ? "Mark not done" : "Mark done"}
-                  onClick={() => dispatch({ type: "toggle-task", id: t.id })}
-                />
-                <span>
-                  {t.title}
-                  {t.remindAt && !t.done ? <em>Remind {clock(t.remindAt)}</em> : null}
-                </span>
-              </div>
-              <TaskMore task={t} />
-            </li>
+            <TodayTask key={t.id} task={t} />
           ))}
         </ul>
         {visibleTasks.length === 0 ? <p className="ws-empty">Nothing left for today.</p> : null}
@@ -275,7 +261,71 @@ export function TodayView({
   );
 }
 
-function TaskMore({ task }: { task: Task }) {
+function TodayTask({ task }: { task: Task }) {
+  const { dispatch } = useStore();
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(task.title);
+  const skipSave = useRef(false);
+
+  const save = () => {
+    if (skipSave.current) {
+      skipSave.current = false;
+      return;
+    }
+    const next = draft.trim();
+    if (next && next !== task.title) dispatch({ type: "set-task", id: task.id, title: next });
+    setDraft(next || task.title);
+    setEditing(false);
+  };
+
+  return (
+    <li className={task.done ? "is-done" : ""}>
+      <div className="task-main">
+        <button
+          className="check"
+          aria-checked={task.done}
+          aria-label={task.done ? "Mark not done" : "Mark done"}
+          onClick={() => dispatch({ type: "toggle-task", id: task.id })}
+        />
+        {editing ? (
+          <input
+            className="task-edit"
+            value={draft}
+            autoFocus
+            aria-label="Edit task"
+            onChange={(event) => setDraft(event.target.value)}
+            onBlur={save}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                event.preventDefault();
+                save();
+              }
+              if (event.key === "Escape") {
+                skipSave.current = true;
+                setDraft(task.title);
+                setEditing(false);
+              }
+            }}
+          />
+        ) : (
+          <span>
+            {task.title}
+            {task.remindAt && !task.done ? <em>Remind {clock(task.remindAt)}</em> : null}
+          </span>
+        )}
+      </div>
+      <TaskMore
+        task={task}
+        onEdit={() => {
+          setDraft(task.title);
+          setEditing(true);
+        }}
+      />
+    </li>
+  );
+}
+
+function TaskMore({ task, onEdit }: { task: Task; onEdit: () => void }) {
   const { dispatch } = useStore();
   const [open, setOpen] = useState(false);
   const root = useRef<HTMLSpanElement>(null);
@@ -308,6 +358,9 @@ function TaskMore({ task }: { task: Task }) {
       </button>
       {open ? (
         <div className="task-more-menu" role="menu">
+          <button type="button" role="menuitem" onClick={() => run(onEdit)}>
+            Edit
+          </button>
           <button
             type="button"
             role="menuitem"
