@@ -3069,6 +3069,27 @@ button:active:not(:disabled) {
   overflow-wrap: anywhere;
 }
 
+.clip-edit {
+  width: 100%;
+  min-height: 140px;
+  margin: 0;
+  resize: vertical;
+  border: 0;
+  border-radius: 12px;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.72);
+  color: #241f18;
+  font: inherit;
+  font-size: 15px;
+  line-height: 1.4;
+  white-space: pre-wrap;
+}
+
+.preview.is-code .clip-edit {
+  font-family: var(--mono);
+  font-size: 12px;
+}
+
 .preview-link span {
   font-size: 12px;
   color: #5c5346;

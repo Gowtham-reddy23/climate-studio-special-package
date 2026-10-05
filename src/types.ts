@@ -206,6 +206,7 @@ export type Action =
   | { type: "remove-note"; id: string }
   | { type: "toggle-note-line"; id: string; index: number }
   | { type: "set-transcript"; id: string; transcript: string }
+  | { type: "edit-clip"; id: string; content: string }
   | { type: "set-ocr"; id: string; ocr: string }
   | { type: "focus-start"; mode: FocusState["mode"]; taskId: string | null; durationMs?: number }
   | { type: "focus-set"; durationMs: number }

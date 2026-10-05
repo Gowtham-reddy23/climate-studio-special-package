@@ -202,6 +202,29 @@ export function reduce(state: AppState, action: Action): AppState {
             : c,
         ),
       };
+    case "edit-clip": {
+      const content = action.content.trim();
+      if (!content) return state;
+      return {
+        ...state,
+        clips: state.clips.map((c) => {
+          if (c.id !== action.id) return c;
+          const line = content.split("\n").find((row) => row.trim())?.trim() ?? content;
+          const preview = line.length > 80 ? `${line.slice(0, 77)}…` : line;
+          const meta = { ...c.meta };
+          if (c.kind === "link") {
+            try {
+              const href = content.includes("://") ? content : `https://${content}`;
+              meta.domain = new URL(href).hostname.replace(/^www\./, "");
+            } catch {
+              /* keep the previous domain */
+            }
+          }
+          if (c.kind === "audio") meta.transcript = content;
+          return { ...c, content, preview, meta };
+        }),
+      };
+    }
     case "focus-start": {
       const duration = action.durationMs && action.durationMs > 0 ? action.durationMs : DURATIONS[action.mode];
       return {

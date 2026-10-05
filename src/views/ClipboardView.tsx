@@ -236,11 +236,29 @@ function ClipCard({ clip, onCopy }: { clip: Clip; onCopy: (content: string) => v
   };
 
   const body = previewText(clip);
+  const editable = canEditClip(clip);
 
   return (
     <article className={`preview is-${clip.kind}`}>
       <div className="preview-stage">
-        {clip.kind === "color" ? (
+        {editable ? (
+          <textarea
+            key={clip.id}
+            className="clip-edit"
+            defaultValue={clip.content}
+            aria-label="Edit clip"
+            spellCheck={clip.kind === "text"}
+            onBlur={(event) => {
+              const next = event.target.value.trim();
+              if (!next) {
+                event.target.value = clip.content;
+                return;
+              }
+              if (next !== clip.content) dispatch({ type: "edit-clip", id: clip.id, content: next });
+            }}
+          />
+        ) : null}
+        {!editable && clip.kind === "color" ? (
           <button className="color-face" style={{ background: clip.content }} onClick={() => onCopy(clip.content)}>
             <span>{clip.meta.colorName ?? "Color"}</span>
             <b>{clip.content}</b>
@@ -267,18 +285,18 @@ function ClipCard({ clip, onCopy }: { clip: Clip; onCopy: (content: string) => v
             />
           </div>
         ) : null}
-        {clip.kind === "code" ? <pre className="code-peek">{clip.content.split("\n").slice(0, 14).join("\n")}</pre> : null}
-        {clip.kind === "link" ? (
+        {!editable && clip.kind === "code" ? <pre className="code-peek">{clip.content.split("\n").slice(0, 14).join("\n")}</pre> : null}
+        {!editable && clip.kind === "link" ? (
           <button className="preview-link" onClick={() => void openLink(linkOf(clip))}>
             <b>{clip.meta.domain ?? "Link"}</b>
             <span>{linkOf(clip)}</span>
           </button>
         ) : null}
-        {clip.kind === "text" || clip.kind === "path" || clip.kind === "file" || clip.kind === "token" || clip.kind === "timecode" ? (
+        {!editable && (clip.kind === "text" || clip.kind === "path" || clip.kind === "file" || clip.kind === "token" || clip.kind === "timecode") ? (
           <p className="preview-lead">{body || headline(clip)}</p>
         ) : null}
       </div>
-      {body && clip.kind !== "audio" && clip.kind !== "image" && clip.kind !== "text" && clip.kind !== "code" && clip.kind !== "path" && clip.kind !== "file" && clip.kind !== "token" && clip.kind !== "timecode" ? (
+      {body && !editable && clip.kind !== "audio" && clip.kind !== "image" && clip.kind !== "text" && clip.kind !== "code" && clip.kind !== "path" && clip.kind !== "file" && clip.kind !== "token" && clip.kind !== "timecode" ? (
         <p className="preview-body">{body}</p>
       ) : null}
       <div className="preview-meta">
@@ -348,6 +366,11 @@ function ClipCard({ clip, onCopy }: { clip: Clip; onCopy: (content: string) => v
       ) : null}
     </article>
   );
+}
+
+function canEditClip(clip: Clip) {
+  if (clip.kind === "image" || clip.kind === "svg" || clip.kind === "audio") return false;
+  return !clip.content.startsWith("data:");
 }
 
 function linkOf(clip: Clip) {
